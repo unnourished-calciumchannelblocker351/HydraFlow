@@ -1,0 +1,44 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test
+*.test
+coverage.out
+coverage.html
+
+# Build
+dist/
+*.tar.gz
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+vendor/
+
+# Config (may contain secrets)
+*.local.yml
+config.local.yml
+
+# Keys
+*.pem
+*.key
+!testdata/*.key
+# Built binaries (not directories)
+/hf-server
+/hydraflow
+/hydraflow-panel
+/hydraflow-sub
