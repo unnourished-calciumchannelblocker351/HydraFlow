@@ -1,0 +1,26 @@
+{
+	admin off
+	auto_https disable_redirects
+}
+
+:443 {
+	tls {
+		protocols tls1.3
+	}
+
+	# Subscription endpoint reverse proxy
+	handle /sub/* {
+		reverse_proxy 127.0.0.1:10086
+	}
+
+	# Health check
+	handle /health {
+		reverse_proxy 127.0.0.1:10085
+	}
+
+	# Default: return 404 (all other traffic goes directly to HydraFlow
+	# via network_mode: host, bypassing Caddy)
+	handle {
+		respond "Not Found" 404
+	}
+}
