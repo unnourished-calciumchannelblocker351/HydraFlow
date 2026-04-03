@@ -1,0 +1,16 @@
+linters:
+  disable:
+    - unused
+    - errcheck
+    - gosimple
+    - staticcheck
+  enable:
+    - govet
+    - typecheck
+
+issues:
+  exclude-dirs:
+    - vendor
+
+run:
+  timeout: 5m
