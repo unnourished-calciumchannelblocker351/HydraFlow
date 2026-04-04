@@ -57,11 +57,13 @@ func cmdUserAdd(cfg *config.Config) {
 		os.Exit(1)
 	}
 
+	serverIP := detectServerIP(cfg.Listen)
+
 	fmt.Printf("User added:\n")
 	fmt.Printf("  Email: %s\n", user.Email)
 	fmt.Printf("  UUID:  %s\n", user.UUID)
 	fmt.Printf("\n")
-	fmt.Printf("  Subscription URL: http://<server>:%s/sub/%s/%s\n",
+	fmt.Printf("  Subscription URL: http://%s:%s/sub/%s/%s\n", serverIP,
 		portFromListen(cfg.Listen), cfg.AdminToken, user.Email)
 	fmt.Printf("\n")
 	fmt.Printf("  Restart HydraFlow to apply: systemctl restart hydraflow\n")
@@ -159,12 +161,13 @@ func cmdUserSub(cfg *config.Config) {
 	}
 
 	port := portFromListen(cfg.Listen)
+	serverIP := detectServerIP(cfg.Listen)
 
 	fmt.Printf("Subscription URLs for %s:\n\n", email)
-	fmt.Printf("  Universal:  http://<server>:%s/sub/%s/%s\n", port, cfg.AdminToken, email)
-	fmt.Printf("  V2Ray:      http://<server>:%s/sub/%s/%s?format=v2ray\n", port, cfg.AdminToken, email)
-	fmt.Printf("  Clash:      http://<server>:%s/sub/%s/%s?format=clash\n", port, cfg.AdminToken, email)
-	fmt.Printf("  sing-box:   http://<server>:%s/sub/%s/%s?format=singbox\n", port, cfg.AdminToken, email)
+	fmt.Printf("  Universal:  http://%s:%s/sub/%s/%s\n", serverIP, port, cfg.AdminToken, email)
+	fmt.Printf("  V2Ray:      http://%s:%s/sub/%s/%s?format=v2ray\n", serverIP, port, cfg.AdminToken, email)
+	fmt.Printf("  Clash:      http://%s:%s/sub/%s/%s?format=clash\n", serverIP, port, cfg.AdminToken, email)
+	fmt.Printf("  sing-box:   http://%s:%s/sub/%s/%s?format=singbox\n", serverIP, port, cfg.AdminToken, email)
 	fmt.Printf("\n")
 	fmt.Printf("  The format is auto-detected from User-Agent if not specified.\n")
 }
