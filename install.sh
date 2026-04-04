@@ -67,20 +67,19 @@ LOG_DIR="/var/log/hydraflow"
 find_free_port() {
     local port=$1
     local max_attempts=10
-    # Check if port is free (no one listening, or only our previous install)
     while [ $max_attempts -gt 0 ]; do
+        # Check if anything is listening on this port
         local pid_on_port
-        pid_on_port=$(ss -tlnp "sport = :${port}" 2>/dev/null | grep -v "^State" | head -1)
+        pid_on_port=$(ss -tlnp 2>/dev/null | grep ":${port} " | head -1 || true)
         if [ -z "$pid_on_port" ]; then
             echo "$port"
             return 0
         fi
-        # If it's our own xray from a previous install, it's fine
+        # Our own previous install is fine
         if echo "$pid_on_port" | grep -q "hydraflow\|/etc/hydraflow"; then
             echo "$port"
             return 0
         fi
-        # Port occupied by something else — try next
         port=$((port + 1000))
         max_attempts=$((max_attempts - 1))
     done
