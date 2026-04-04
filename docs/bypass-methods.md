@@ -7,15 +7,16 @@ HydraFlow supports multiple bypass methods simultaneously. Each method has diffe
 ## Table of Contents
 
 1. [Quick Reference Table](#quick-reference-table)
-2. [VLESS + Reality](#vless--reality)
-3. [VLESS + WebSocket + CDN (Cloudflare)](#vless--websocket--cdn-cloudflare)
-4. [Shadowsocks-2022](#shadowsocks-2022)
-5. [Multi-Hop (Chain)](#multi-hop-chain)
-6. [Fragment Bypass](#fragment-bypass)
-7. [Hysteria2 (QUIC)](#hysteria2-quic)
-8. [ShadowTLS](#shadowtls)
-9. [Method Selection Flowchart](#method-selection-flowchart)
-10. [ISP-Specific Recommendations (Russia)](#isp-specific-recommendations-russia)
+2. [Split Tunneling](#split-tunneling)
+3. [VLESS + Reality](#vless--reality)
+4. [VLESS + WebSocket + CDN (Cloudflare)](#vless--websocket--cdn-cloudflare)
+5. [Shadowsocks-2022](#shadowsocks-2022)
+6. [Multi-Hop (Chain)](#multi-hop-chain)
+7. [Fragment Bypass](#fragment-bypass)
+8. [Hysteria2 (QUIC)](#hysteria2-quic)
+9. [ShadowTLS](#shadowtls)
+10. [Method Selection Flowchart](#method-selection-flowchart)
+11. [ISP-Specific Recommendations (Russia)](#isp-specific-recommendations-russia)
 
 ---
 
@@ -30,6 +31,74 @@ HydraFlow supports multiple bypass methods simultaneously. Each method has diffe
 | Fragment Bypass | Medium | Fast | Auto | No | Basic DPI without TCP reassembly |
 | Hysteria2 (QUIC) | Medium | Very Fast | Auto | No | Bandwidth-limited DPI |
 | ShadowTLS | High | Fast | Auto | No | Active probing |
+
+---
+
+## Split Tunneling
+
+### Why It Exists
+
+Starting April 15, 2026, Russian platforms (Yandex, VK, Ozon, Wildberries, Sberbank, Gosuslugi, and others) are required to detect and block users connecting through VPNs. If you access these services through a proxy, you may be blocked or asked to disconnect your VPN.
+
+Split tunneling solves this: traffic to Russian services goes **DIRECT** (bypassing the proxy), while blocked foreign sites (YouTube, Instagram, Twitter, etc.) go **through the proxy**. Users can access both without disconnecting.
+
+### How It Works
+
+HydraFlow configures routing rules at three levels:
+
+1. **Server side (xray):** The xray routing config sends traffic destined for Russian domains and Russian IPs directly, without proxying. This is configured in `install.sh` and uses both explicit domain lists and `geosite:category-ru` for broad coverage.
+
+2. **Client side (Clash/Clash Meta):** The subscription server generates Clash configs with `DOMAIN-SUFFIX` rules for major Russian platforms and `GEOSITE,category-ru,DIRECT` as a catch-all. Russian sites connect directly from the user's device.
+
+3. **Client side (sing-box):** The subscription server generates sing-box configs with `domain_suffix` and `geosite`/`geoip` rules that route Russian traffic directly.
+
+### Covered Platforms
+
+The following platforms are explicitly listed (in addition to `geosite:category-ru` which covers thousands more):
+
+| Category | Domains |
+|----------|---------|
+| Search & services | ya.ru, yandex.ru, yandex.com, yandex.net, dzen.ru |
+| Social networks | vk.com, vk.me, ok.ru, mail.ru |
+| E-commerce | ozon.ru, wildberries.ru, wb.ru, avito.ru, cian.ru |
+| Banking | sber.ru, sberbank.ru, tinkoff.ru, alfa-bank.ru, vtb.ru |
+| Government | gosuslugi.ru, mos.ru, nalog.ru, nalog.gov.ru |
+| News & media | ria.ru, rbc.ru, tass.ru, rt.com, 1tv.ru |
+| Streaming | kinopoisk.ru, ivi.ru, okko.tv, rutube.ru |
+| Jobs | hh.ru |
+
+### How Each Client Handles It
+
+**v2rayNG / Hiddify (V2Ray format):**
+Split tunneling is handled server-side. The xray config routes Russian domains directly before they reach the proxy tunnel. No client-side configuration needed.
+
+**Clash / Clash Meta / Clash Verge Rev:**
+The subscription includes `DOMAIN-SUFFIX` rules for each platform and `GEOSITE,category-ru,DIRECT` + `GEOIP,RU,DIRECT` catch-all rules. The client evaluates rules top-to-bottom and sends matching traffic directly.
+
+**sing-box / Hiddify (sing-box mode):**
+The subscription includes `domain_suffix`, `geosite`, and `geoip` route rules. Russian traffic is matched and sent to the `direct` outbound.
+
+### Adding Custom Domains
+
+If a Russian site is not in the list and gets blocked when accessed through the proxy, you can add it:
+
+- The domain list is defined in `bypass/split.go` (source of truth)
+- Server-side rules are in `install.sh` (xray routing section)
+- Client-side rules are generated in `tools/sub-server.go`
+
+After adding a domain, reinstall or regenerate configs:
+
+```bash
+# Regenerate xray config with updated domains
+hydraflow config --regenerate
+
+# Or reinstall (safe, preserves credentials)
+bash <(curl -fsSL https://raw.githubusercontent.com/Evr1kys/HydraFlow/main/install.sh)
+```
+
+### China and Iran
+
+Split tunneling lists are also available for China (`ChineseDirectDomains`) and Iran (`IranianDirectDomains`) in `bypass/split.go`. These are not active by default but can be enabled for users in those countries.
 
 ---
 

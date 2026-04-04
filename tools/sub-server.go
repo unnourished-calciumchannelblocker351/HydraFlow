@@ -1176,8 +1176,45 @@ func (s *server) serveClash(w http.ResponseWriter, protocols []orderedProtocol, 
 	b.WriteString("    url: https://www.gstatic.com/generate_204\n")
 	b.WriteString("    interval: 300\n\n")
 
-	// Rules.
+	// Rules — split tunneling: Russian sites go DIRECT to avoid VPN detection.
 	b.WriteString("rules:\n")
+	b.WriteString("  - DOMAIN-SUFFIX,ya.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,yandex.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,yandex.com,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,yandex.net,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,vk.com,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,vk.me,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,vkontakte.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,mail.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,ok.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,ozon.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,ozon.travel,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,wildberries.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,wb.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,sber.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,sberbank.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,gosuslugi.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,mos.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,nalog.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,nalog.gov.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,avito.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,cian.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,hh.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,tinkoff.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,alfa-bank.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,vtb.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,ria.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,rbc.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,tass.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,rt.com,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,1tv.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,kinopoisk.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,ivi.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,okko.tv,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,rutube.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,dzen.ru,DIRECT\n")
+	b.WriteString("  - DOMAIN-SUFFIX,vkusvill.ru,DIRECT\n")
+	b.WriteString("  - GEOSITE,category-ru,DIRECT\n")
 	b.WriteString("  - GEOIP,PRIVATE,DIRECT\n")
 	b.WriteString("  - GEOSITE,category-ads-all,REJECT\n")
 	b.WriteString("  - GEOIP,CN,DIRECT\n")
@@ -1384,6 +1421,25 @@ func (s *server) serveSingBox(w http.ResponseWriter, protocols []orderedProtocol
 			"auto_detect_interface": true,
 			"rules": []map[string]interface{}{
 				{"protocol": "dns", "outbound": "dns-out"},
+				{
+					"domain_suffix": []string{
+						".ya.ru", ".yandex.ru", ".yandex.com", ".yandex.net",
+						".vk.com", ".vk.me", ".vkontakte.ru", ".vkusvill.ru",
+						".mail.ru", ".ok.ru",
+						".ozon.ru", ".ozon.travel",
+						".wildberries.ru", ".wb.ru",
+						".sber.ru", ".sberbank.ru",
+						".gosuslugi.ru", ".mos.ru", ".nalog.ru", ".nalog.gov.ru",
+						".avito.ru", ".cian.ru", ".hh.ru",
+						".tinkoff.ru", ".alfa-bank.ru", ".vtb.ru",
+						".ria.ru", ".rbc.ru", ".tass.ru", ".rt.com", ".1tv.ru",
+						".kinopoisk.ru", ".ivi.ru", ".okko.tv",
+						".rutube.ru", ".dzen.ru",
+					},
+					"outbound": "direct",
+				},
+				{"geosite": []string{"category-ru"}, "outbound": "direct"},
+				{"geoip": []string{"ru"}, "outbound": "direct"},
 				{"geoip": []string{"private"}, "outbound": "direct"},
 				{"geosite": []string{"category-ads-all"}, "outbound": "block"},
 			},

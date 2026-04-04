@@ -90,6 +90,14 @@ That's it. Now connect your devices.
 
 ## How does it work?
 
+### Split tunneling (new)
+
+Russian sites (Yandex, VK, Ozon, Wildberries, Sber, Gosuslugi) go **direct** -- no proxy. Blocked sites (YouTube, Instagram, Twitter) go **through the proxy**. You can use both without disconnecting. This is critical because Russian platforms are required to block VPN users starting April 15, 2026.
+
+Works automatically in all clients (v2rayNG, Hiddify, Clash, sing-box). No configuration needed.
+
+### Bypass methods
+
 HydraFlow sets up all known bypass methods at once:
 
 | Method | What it does | When it helps |
@@ -197,6 +205,7 @@ docker run -d --name hydraflow --network host \
 |---------|-----------|------|----------|---------|---------|
 | One-command install | Yes | No | No | Yes | Yes |
 | Auto protocol selection | Yes | No | No | No | No |
+| Split tunneling (RU sites direct) | Yes | Manual | Manual | No | No |
 | Works when IP is blocked (CDN) | Yes | Manual | Manual | No | No |
 | Smart subscription by ISP | Yes | No | No | No | No |
 | Multiple servers with failover | Yes | No | Partial | No | No |

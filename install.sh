@@ -778,8 +778,47 @@ cat > "${XRAY_CONFIG}" << XRAYEOF
       },
       {
         "type": "field",
-        "outboundTag": "block",
-        "ip": ["geoip:private"]
+        "outboundTag": "direct",
+        "domain": [
+          "domain:ya.ru",
+          "domain:yandex.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:vk.com",
+          "domain:vk.me",
+          "domain:vkontakte.ru",
+          "domain:vkusvill.ru",
+          "domain:mail.ru",
+          "domain:ok.ru",
+          "domain:ozon.ru",
+          "domain:ozon.travel",
+          "domain:wildberries.ru",
+          "domain:wb.ru",
+          "domain:sber.ru",
+          "domain:sberbank.ru",
+          "domain:online.sberbank.ru",
+          "domain:gosuslugi.ru",
+          "domain:mos.ru",
+          "domain:nalog.ru",
+          "domain:nalog.gov.ru",
+          "domain:avito.ru",
+          "domain:cian.ru",
+          "domain:hh.ru",
+          "domain:tinkoff.ru",
+          "domain:alfa-bank.ru",
+          "domain:vtb.ru",
+          "domain:ria.ru",
+          "domain:rbc.ru",
+          "domain:tass.ru",
+          "domain:rt.com",
+          "domain:1tv.ru",
+          "domain:kinopoisk.ru",
+          "domain:ivi.ru",
+          "domain:okko.tv",
+          "domain:rutube.ru",
+          "domain:dzen.ru",
+          "geosite:category-ru"
+        ]
       },
       {
         "type": "field",
@@ -808,6 +847,11 @@ cat > "${XRAY_CONFIG}" << XRAYEOF
           "domain:yandexadexchange.net",
           "domain:adfox.ru"
         ]
+      },
+      {
+        "type": "field",
+        "outboundTag": "block",
+        "ip": ["geoip:private"]
       },
       {
         "type": "field",
