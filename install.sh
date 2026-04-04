@@ -955,6 +955,34 @@ SUBSVCEOF
 
 success "hydraflow-sub.service created"
 
+# Check if required ports are free before starting services
+check_port() {
+    local port=$1
+    local name=$2
+    if ss -tlnp 2>/dev/null | grep -q ":${port} " || \
+       netstat -tlnp 2>/dev/null | grep -q ":${port} "; then
+        local pid
+        pid=$(ss -tlnp 2>/dev/null | grep ":${port} " | sed -E 's/.*pid=([0-9]+).*/\1/' | head -1)
+        warn "Port ${port} (${name}) is already in use (pid: ${pid:-unknown})."
+        warn "  Consider stopping the conflicting service or changing ${name} port."
+        return 1
+    fi
+    return 0
+}
+
+PORT_CONFLICT=0
+check_port "${REALITY_PORT}" "Reality"  || PORT_CONFLICT=1
+check_port "${WS_PORT}"      "WebSocket" || PORT_CONFLICT=1
+check_port "${SS_PORT}"      "Shadowsocks" || PORT_CONFLICT=1
+check_port "${SUB_PORT}"     "Subscription" || PORT_CONFLICT=1
+
+if [[ ${PORT_CONFLICT} -eq 1 ]]; then
+    warn ""
+    warn "One or more required ports are occupied."
+    warn "Services may fail to start. Consider freeing the ports above."
+    warn ""
+fi
+
 # Enable and start
 systemctl daemon-reload
 
