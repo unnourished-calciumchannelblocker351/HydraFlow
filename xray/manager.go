@@ -61,6 +61,11 @@ type XrayManager struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	// waitDone is closed when cmd.Wait() has been called exactly once by monitor().
+	// Stop() selects on this channel instead of calling Wait() a second time.
+	waitDone chan struct{}
+	waitErr  error
 }
 
 // NewManager creates a new XrayManager.
@@ -157,6 +162,7 @@ func (m *XrayManager) Start() error {
 	m.process = cmd.Process
 	m.startedAt = time.Now()
 	m.running = true
+	m.waitDone = make(chan struct{})
 
 	m.logger.Info("xray-core started",
 		"pid", cmd.Process.Pid,
@@ -189,20 +195,17 @@ func (m *XrayManager) Stop() error {
 		}
 	}
 
-	// Wait for process to exit (with timeout).
-	done := make(chan error, 1)
-	go func() {
-		done <- m.cmd.Wait()
-	}()
-
+	// Wait for monitor() to observe the process exit (it calls cmd.Wait()
+	// exactly once). We do NOT call cmd.Wait() here to avoid a double-wait panic.
 	select {
-	case err := <-done:
-		if err != nil {
-			m.logger.Debug("xray exited with error", "error", err)
+	case <-m.waitDone:
+		if m.waitErr != nil {
+			m.logger.Debug("xray exited with error", "error", m.waitErr)
 		}
 	case <-time.After(10 * time.Second):
 		m.logger.Warn("xray did not stop gracefully, killing")
 		m.process.Kill()
+		<-m.waitDone // wait for monitor to finish after kill
 	}
 
 	m.running = false
@@ -271,6 +274,8 @@ func (m *XrayManager) Close() error {
 }
 
 // monitor watches the xray subprocess and logs if it exits unexpectedly.
+// It is the only goroutine that calls cmd.Wait(), and it signals completion
+// via m.waitDone so that Stop() never double-waits.
 func (m *XrayManager) monitor() {
 	if m.cmd == nil {
 		return
@@ -280,7 +285,11 @@ func (m *XrayManager) monitor() {
 
 	m.mu.Lock()
 	m.running = false
+	m.waitErr = err
 	m.mu.Unlock()
+
+	// Signal that Wait() has returned.
+	close(m.waitDone)
 
 	select {
 	case <-m.ctx.Done():

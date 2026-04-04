@@ -4,11 +4,18 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/binary"
+	"fmt"
 	"math/big"
 	"net"
 	"sync"
 	"time"
 )
+
+// maxPaddedDataLen is the maximum real data length that can be encoded
+// in a padded frame. The wire format uses uint16 for both the total
+// frame length and the real data length; the 4-byte header leaves at
+// most 65531 bytes for payload (65535 - 4).
+const maxPaddedDataLen = 65531
 
 // PaddingTechnique adds random padding to packets to change size
 // distribution and defeats DPI that uses statistical traffic analysis.
@@ -111,6 +118,9 @@ func (pc *PaddingConn) Write(b []byte) (int, error) {
 // sendPadded writes data with frame and data length prefixes and random padding.
 func (pc *PaddingConn) sendPadded(data []byte) (int, error) {
 	realLen := len(data)
+	if realLen > maxPaddedDataLen {
+		return 0, fmt.Errorf("data length %d exceeds maximum padded frame capacity %d", realLen, maxPaddedDataLen)
+	}
 
 	// Calculate target padded size (includes 4-byte header).
 	targetSize := randBetween(pc.padMin, pc.padMax)
@@ -288,9 +298,16 @@ func StripPadding(packet []byte) []byte {
 }
 
 // AddPadding creates a padded packet from raw data.
+// Returns nil if data length exceeds the maximum encodable size (65531 bytes).
 func AddPadding(data []byte, targetSize int) []byte {
+	if len(data) > maxPaddedDataLen {
+		return nil
+	}
 	if targetSize < len(data)+4 {
 		targetSize = len(data) + 4
+	}
+	if targetSize > 65535+2 {
+		targetSize = 65535 + 2 // max total frame that fits uint16 frame-length field
 	}
 	packet := make([]byte, targetSize)
 	// Total frame length (bytes after this 2-byte field).

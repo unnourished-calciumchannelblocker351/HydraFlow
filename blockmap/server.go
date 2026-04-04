@@ -355,20 +355,29 @@ func (s *MapServer) checkRateLimit(ip string) bool {
 }
 
 // extractIP extracts the client IP from the request.
+// Proxy headers (X-Forwarded-For, X-Real-IP) are only trusted when
+// the direct peer is localhost (127.0.0.1 or ::1), preventing header
+// spoofing from untrusted sources.
 func extractIP(r *http.Request) string {
-	// Check X-Forwarded-For, X-Real-IP.
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.SplitN(xff, ",", 2)
-		return strings.TrimSpace(parts[0])
+	peerIP, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if peerIP == "" {
+		peerIP = r.RemoteAddr
 	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
+	trusted := peerIP == "127.0.0.1" || peerIP == "::1"
+
+	if trusted {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			parts := strings.SplitN(xff, ",", 2)
+			if ip := strings.TrimSpace(parts[0]); ip != "" {
+				return ip
+			}
+		}
+		if xri := r.Header.Get("X-Real-IP"); xri != "" {
+			return xri
+		}
 	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
+
+	return peerIP
 }
 
 // Start starts the map server and blocks until context is cancelled.

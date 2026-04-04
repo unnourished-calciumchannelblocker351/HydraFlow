@@ -289,7 +289,11 @@ func FindSNIOffset(data []byte) int {
 // boundary. The first piece contains everything up to the SNI, and
 // the second piece contains the SNI and everything after.
 // If the SNI offset cannot be found, it splits at the midpoint.
+// An empty or nil input is returned as-is with a nil second piece.
 func FragmentAtSNI(data []byte) ([]byte, []byte) {
+	if len(data) == 0 {
+		return data, nil
+	}
 	offset := FindSNIOffset(data)
 	if offset <= 0 || offset >= len(data) {
 		// Fallback: split at midpoint.

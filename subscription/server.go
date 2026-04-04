@@ -433,28 +433,33 @@ func (s *SubServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(status)
 }
 
-// extractClientIP extracts the real client IP from the request,
-// considering reverse proxy headers.
+// extractClientIP extracts the real client IP from the request.
+// Proxy headers (X-Forwarded-For, X-Real-IP) are only trusted when
+// the direct peer is localhost (127.0.0.1 or ::1), preventing header
+// spoofing from untrusted sources.
 func extractClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header.
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.SplitN(xff, ",", 2)
-		if ip := strings.TrimSpace(parts[0]); ip != "" {
-			return ip
+	peerIP, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if peerIP == "" {
+		peerIP = r.RemoteAddr
+	}
+	trusted := peerIP == "127.0.0.1" || peerIP == "::1"
+
+	if trusted {
+		// Check X-Forwarded-For header.
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			parts := strings.SplitN(xff, ",", 2)
+			if ip := strings.TrimSpace(parts[0]); ip != "" {
+				return ip
+			}
+		}
+
+		// Check X-Real-IP header.
+		if xri := r.Header.Get("X-Real-IP"); xri != "" {
+			return xri
 		}
 	}
 
-	// Check X-Real-IP header.
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-
-	// Fall back to RemoteAddr.
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
+	return peerIP
 }
 
 // rateLimiter implements a simple token bucket rate limiter per key.

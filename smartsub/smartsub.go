@@ -1009,8 +1009,25 @@ func NewTelemetryStore() *TelemetryStore {
 	}
 }
 
-// Record stores a telemetry report.
+// knownProtocols is the set of valid protocol names accepted in telemetry reports.
+var knownTelemetryProtocols = map[string]bool{
+	"reality":    true,
+	"ws":         true,
+	"ws-cdn":     true,
+	"grpc":       true,
+	"grpc-cdn":   true,
+	"xhttp":      true,
+	"ss":         true,
+	"hysteria2":  true,
+	"shadowtls":  true,
+	"chain":      true,
+}
+
+// Record stores a telemetry report. Unknown protocol names are silently rejected.
 func (ts *TelemetryStore) Record(isp string, report TelemetryReport) {
+	if !knownTelemetryProtocols[report.Protocol] {
+		return
+	}
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 	ts.total++

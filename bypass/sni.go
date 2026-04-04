@@ -15,7 +15,7 @@ import (
 // candidates for Reality SNI.
 var UnblockableSNIs = map[string][]string{
 	"russia": {
-		"gosuslugi.ru",   // Russian government services
+		"gosuslugi.ru",   // Russian government services / E-government
 		"nalog.ru",       // Russian tax service
 		"sberbank.ru",    // Largest Russian bank
 		"ya.ru",          // Yandex (short domain)
@@ -28,7 +28,6 @@ var UnblockableSNIs = map[string][]string{
 		"kremlin.ru",     // Kremlin official site
 		"cbr.ru",         // Central Bank of Russia
 		"pfr.gov.ru",     // Pension fund
-		"gosuslugi.ru",   // E-government
 		"nalog.gov.ru",   // Tax service
 	},
 	"china": {

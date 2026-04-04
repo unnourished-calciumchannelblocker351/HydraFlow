@@ -13,7 +13,7 @@ RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o /bin/hydraflow-map ./cmd/hydraflo
 
 FROM alpine:3.20
 
-RUN apk add --no-cache ca-certificates tzdata curl xray
+RUN apk add --no-cache ca-certificates tzdata curl
 
 COPY --from=builder /bin/hydraflow /usr/local/bin/hydraflow
 COPY --from=builder /bin/hydraflow-sub /usr/local/bin/hydraflow-sub
