@@ -20,6 +20,12 @@
   <a href="README.zh.md">中文</a>
 </p>
 
+<p align="center">
+  <a href="https://hydraflow.xyz">Website</a> &bull;
+  <a href="https://docs.hydraflow.xyz">Documentation</a> &bull;
+  <a href="https://github.com/Evr1kys/HydraFlow/releases">Download</a>
+</p>
+
 ---
 
 ## What is this?
