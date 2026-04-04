@@ -21,6 +21,12 @@
 //	hydraflow server list               List servers
 //	hydraflow server health             Check all servers health
 //
+//	hydraflow update                    Check for updates and upgrade
+//	hydraflow test <vless-link>         Test VLESS link connectivity
+//	hydraflow export --format <fmt>     Export config for client app
+//	hydraflow backup [path]             Backup all configs
+//	hydraflow restore <file>            Restore from backup
+//
 //	hydraflow status                    Show service status
 //	hydraflow probe <host:port>         Run censorship probes
 //	hydraflow version                   Version info
@@ -57,6 +63,16 @@ func main() {
 		cmdStatus()
 	case "probe":
 		cmdProbe()
+	case "update":
+		cmdUpdate()
+	case "test":
+		cmdTest()
+	case "export":
+		cmdExport()
+	case "backup":
+		cmdBackup()
+	case "restore":
+		cmdRestore()
 	case "version":
 		fmt.Printf("hydraflow %s (built %s)\n", version, buildTime)
 	case "help", "-h", "--help":
@@ -140,6 +156,11 @@ Usage:
   hydraflow server <add|list|health>  Manage multi-server setup
   hydraflow status                    Show service status
   hydraflow probe <host:port>         Run censorship detection probes
+  hydraflow update                    Check for updates and upgrade binary
+  hydraflow test <vless-link>         Test if a VLESS link is reachable
+  hydraflow export --format <fmt>     Export config for client app
+  hydraflow backup [path]             Backup all configs to archive
+  hydraflow restore <file>            Restore configs from backup
   hydraflow version                   Print version information
 
 Serve flags:
@@ -158,11 +179,24 @@ Server commands:
   hydraflow server list               List all servers with status
   hydraflow server health             Check health of all servers
 
+Export formats:
+  hydraflow export --format v2ray     Base64-encoded V2Ray subscription links
+  hydraflow export --format clash     Clash Meta YAML configuration
+  hydraflow export --format singbox   sing-box JSON configuration
+
+Backup & restore:
+  hydraflow backup                    Save to /etc/hydraflow/backup.tar.gz
+  hydraflow backup /tmp/hf.tar.gz    Save to custom path
+  hydraflow restore backup.tar.gz    Restore from archive
+
 Examples:
   hydraflow serve                     Start with config defaults
   hydraflow serve --mode 3xui         Read from 3x-ui database
   hydraflow user add user@example.com Add a user
   hydraflow probe server.com:443      Test for censorship
+  hydraflow test "vless://uuid@host:443?security=reality&..."
+  hydraflow export --format clash > clash-config.yaml
+  hydraflow update                    Self-update to latest release
 `, version)
 }
 

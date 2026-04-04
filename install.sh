@@ -147,6 +147,16 @@ if [[ "${1:-}" == "--uninstall" || "${1:-}" == "uninstall" || "${1:-}" == "remov
 fi
 
 # =============================================================================
+#  Non-interactive flag detection
+# =============================================================================
+AUTO_YES=false
+for arg in "$@"; do
+    case "$arg" in
+        --yes|-y) AUTO_YES=true ;;
+    esac
+done
+
+# =============================================================================
 #  Rollback on failure
 # =============================================================================
 INSTALL_STAGE=""
@@ -256,6 +266,49 @@ if [[ ${DISK_FREE_MB} -gt 0 ]]; then
     else
         success "Disk: ${DISK_FREE_MB}MB free"
     fi
+fi
+
+# =============================================================================
+#  2b. Interactive configuration wizard
+# =============================================================================
+XUI_MODE=false
+CDN_DOMAIN=""
+
+if [[ "${AUTO_YES}" == "true" ]]; then
+    info "Non-interactive mode (--yes): using defaults"
+else
+    echo ""
+    echo -e "  ${BOLD}Configuration:${NC}"
+    echo ""
+
+    # Ask about mode
+    read -p "  Install mode (1=standalone, 2=alongside 3x-ui): " INSTALL_MODE
+    case "$INSTALL_MODE" in
+        2)
+            XUI_MODE=true
+            echo -e "  ${GREEN}Will read users from 3x-ui database${NC}"
+            ;;
+        *)
+            XUI_MODE=false
+            ;;
+    esac
+
+    # Ask about CDN
+    read -p "  Do you have a domain for CDN bypass? (y/n): " HAS_DOMAIN
+    if [[ "$HAS_DOMAIN" == "y" ]]; then
+        read -p "  Enter domain (e.g. vpn.example.com): " CDN_DOMAIN
+        echo -e "  ${GREEN}CDN transport will be configured for ${CDN_DOMAIN}${NC}"
+    fi
+
+    # Ask about ports (with defaults)
+    read -p "  Reality port [443]: " REALITY_PORT_INPUT
+    REALITY_PORT=${REALITY_PORT_INPUT:-443}
+
+    read -p "  WebSocket port [2053]: " WS_PORT_INPUT
+    WS_PORT=${WS_PORT_INPUT:-2053}
+
+    echo ""
+    info "Configuration complete. Starting installation..."
 fi
 
 # =============================================================================
