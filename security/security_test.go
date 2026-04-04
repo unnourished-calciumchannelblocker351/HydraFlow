@@ -1,7 +1,9 @@
 package security
 
 import (
+	"crypto/sha256"
 	"crypto/tls"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -297,8 +299,17 @@ func TestHashIPForLog_DifferentIPsDifferentHashes(t *testing.T) {
 
 func TestHashIPForLog_Length(t *testing.T) {
 	h := hashIPForLog("10.0.0.1")
-	// sha256Short returns first 4 bytes as hex = 8 hex chars.
-	if len(h) != 8 {
-		t.Fatalf("expected 8 hex chars, got %d (%s)", len(h), h)
+	// sha256Short returns first 8 bytes as hex = 16 hex chars (salted).
+	if len(h) != 16 {
+		t.Fatalf("expected 16 hex chars, got %d (%s)", len(h), h)
+	}
+}
+
+func TestHashIPForLog_Salted(t *testing.T) {
+	// Verify the hash is not a plain unsalted SHA-256 prefix.
+	h := hashIPForLog("10.0.0.1")
+	plainHash := fmt.Sprintf("%x", sha256.Sum256([]byte("10.0.0.1")))[:16]
+	if h == plainHash {
+		t.Fatal("hash should be salted, but matches unsalted SHA-256")
 	}
 }

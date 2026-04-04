@@ -313,6 +313,10 @@ type knockState struct {
 	lastKnock int64 // unix timestamp
 }
 
+// maxKnockStates limits the number of in-progress knock sequences
+// to prevent memory exhaustion from spoofed source IPs.
+const maxKnockStates = 10000
+
 // NewPortKnocking creates a port knocking handler.
 func NewPortKnocking(sequence []int, timeoutSec int, logger *slog.Logger) *PortKnocking {
 	if logger == nil {
@@ -321,12 +325,15 @@ func NewPortKnocking(sequence []int, timeoutSec int, logger *slog.Logger) *PortK
 	if timeoutSec <= 0 {
 		timeoutSec = 30
 	}
-	return &PortKnocking{
+	pk := &PortKnocking{
 		sequence: sequence,
 		timeout:  timeoutSec,
 		states:   make(map[string]*knockState),
 		logger:   logger,
 	}
+	// Start periodic cleanup of stale knock states.
+	go pk.cleanupLoop()
+	return pk
 }
 
 // RecordKnock records a port knock from an IP. Returns true if the
@@ -343,6 +350,10 @@ func (pk *PortKnocking) RecordKnock(ip string, port int) bool {
 	state, exists := pk.states[ip]
 
 	if !exists {
+		// Bound the map size to prevent memory exhaustion.
+		if len(pk.states) >= maxKnockStates {
+			return false
+		}
 		state = &knockState{}
 		pk.states[ip] = state
 	}
@@ -371,6 +382,22 @@ func (pk *PortKnocking) RecordKnock(ip string, port int) bool {
 	}
 
 	return false
+}
+
+// cleanupLoop periodically evicts stale port knocking states.
+func (pk *PortKnocking) cleanupLoop() {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		pk.mu.Lock()
+		now := unixNow()
+		for ip, state := range pk.states {
+			if state.lastKnock > 0 && (now-state.lastKnock) > int64(pk.timeout) {
+				delete(pk.states, ip)
+			}
+		}
+		pk.mu.Unlock()
+	}
 }
 
 // ---- Helpers ----

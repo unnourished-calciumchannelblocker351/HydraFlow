@@ -316,7 +316,9 @@ func (e *Engine) handleSubscription(w http.ResponseWriter, r *http.Request) {
 		time.Now().Add(30*24*time.Hour).Unix(),
 	))
 	w.Header().Set("Profile-Update-Interval", "6")
-	w.Header().Set("X-HydraFlow-ISP", ispName)
+	// NOTE: ISP name intentionally NOT sent in response headers.
+	// Exposing it would let network observers fingerprint HydraFlow traffic
+	// and reveal the user's detected ISP.
 
 	// Generate V2Ray base64 links from nodes directly.
 	var links []string

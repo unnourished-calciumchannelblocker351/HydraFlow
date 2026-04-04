@@ -813,9 +813,8 @@ func TestHTTPHandler_SubscriptionOK(t *testing.T) {
 	if rr.Header().Get("Subscription-UserInfo") == "" {
 		t.Error("missing Subscription-UserInfo header")
 	}
-	if rr.Header().Get("X-HydraFlow-ISP") == "" {
-		t.Error("missing X-HydraFlow-ISP header")
-	}
+	// X-HydraFlow-ISP header intentionally removed for security —
+	// it would let observers fingerprint HydraFlow traffic.
 }
 
 func TestHTTPHandler_SubscriptionWrongToken(t *testing.T) {

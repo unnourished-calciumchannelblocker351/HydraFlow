@@ -250,10 +250,8 @@ func (r *Reporter) doubleEncrypt(plaintext []byte) ([]byte, error) {
 	// Inner encryption for the collector.
 	innerKey := r.config.CollectorPublicKey
 	if len(innerKey) == 0 {
-		// Fallback: derive a key from a fixed seed.
-		// In production, this would use proper HPKE key exchange.
-		h := sha256.Sum256([]byte("hydraflow-collector-default"))
-		innerKey = h[:]
+		// No collector key configured — refuse to send unprotected telemetry.
+		return nil, fmt.Errorf("collector public key not configured, refusing to send telemetry")
 	}
 
 	innerCiphertext, err := aesGCMEncrypt(innerKey, plaintext)
@@ -264,8 +262,8 @@ func (r *Reporter) doubleEncrypt(plaintext []byte) ([]byte, error) {
 	// Outer encryption for the relay.
 	outerKey := r.config.RelayPublicKey
 	if len(outerKey) == 0 {
-		h := sha256.Sum256([]byte("hydraflow-relay-default"))
-		outerKey = h[:]
+		// No relay key configured — refuse to send unprotected telemetry.
+		return nil, fmt.Errorf("relay public key not configured, refusing to send telemetry")
 	}
 
 	outerCiphertext, err := aesGCMEncrypt(outerKey, innerCiphertext)

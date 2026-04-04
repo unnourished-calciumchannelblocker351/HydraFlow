@@ -584,7 +584,8 @@ func (cb *ConfigBuilder) buildVMessWSInbound(in InboundConfig) map[string]interf
 					"keyFile":         in.TLSKeyFile,
 				},
 			},
-			"alpn": []string{"http/1.1"},
+			"minVersion": "1.3",
+			"alpn":       []string{"http/1.1"},
 		}
 	}
 
@@ -639,7 +640,7 @@ func (cb *ConfigBuilder) buildTrojanTLSInbound(in InboundConfig) map[string]inte
 					"keyFile":         in.TLSKeyFile,
 				},
 			},
-			"minVersion": "1.2",
+			"minVersion": "1.3",
 			"alpn":       []string{"h2", "http/1.1"},
 		},
 	}

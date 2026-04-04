@@ -622,13 +622,13 @@ if [[ -z "${PRIVATE_KEY:-}" && -n "${PUBLIC_KEY:-}" ]]; then
     PUBLIC_KEY=$(echo "${X25519_OUTPUT}" | grep -i "public" | awk '{print $NF}')
 fi
 
-success "UUID:          ${UUID}"
-success "Public key:    ${PUBLIC_KEY:0:20}..."
+success "UUID:          ${UUID:0:8}..."
+success "Public key:    ${PUBLIC_KEY:0:12}..."
 success "Short ID:      ${SHORT_ID}"
 success "WS path:       ${WS_PATH}"
 success "SS method:     ${SS_METHOD}"
-success "SS password:   ${SS_PASSWORD:0:12}..."
-success "Sub token:     ${SUB_TOKEN:0:16}..."
+success "SS password:   <see ${CREDS_FILE}>"
+success "Sub token:     <see ${CREDS_FILE}>"
 
 # Save credentials backup with strict permissions (owner-only read/write)
 cat > "${CREDS_FILE}" << CREDSEOF

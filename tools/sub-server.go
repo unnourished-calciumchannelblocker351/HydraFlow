@@ -258,8 +258,9 @@ func (l *ispLookup) lookup(ip string) (string, *ipAPIResponse) {
 	}
 
 	// Query ip-api.com (free, no key required, 45 req/min).
+	// Use HTTPS to prevent DPI from seeing the queried IP address.
 	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Get(fmt.Sprintf("http://ip-api.com/json/%s?fields=status,country,isp,org,as,query", ip))
+	resp, err := client.Get(fmt.Sprintf("https://ip-api.com/json/%s?fields=status,country,isp,org,as,query", ip))
 	if err != nil {
 		log.Printf("[isp-lookup] error querying ip-api for %s: %v", hashIP(ip), err)
 		return "default", nil
@@ -686,7 +687,7 @@ func main() {
 	}
 
 	log.Printf("HydraFlow Smart Subscription Server starting on %s", addr)
-	log.Printf("Subscription URL: http://%s:%d/sub/%s", cfg.ServerIP, cfg.SubPort, cfg.SubToken)
+	log.Printf("Subscription URL: http://%s:%d/sub/<token-hidden>", cfg.ServerIP, cfg.SubPort)
 	log.Printf("Configured protocols: %s", strings.Join(protocolNames(cfg), ", "))
 	if err := httpServer.ListenAndServe(); err != nil {
 		log.Fatalf("Server error: %v", err)
@@ -971,7 +972,9 @@ func (s *server) setSubHeaders(w http.ResponseWriter, ispName string) {
 	w.Header().Set("Profile-Update-Interval", "6")
 	w.Header().Set("Profile-Title", "base64:"+base64.StdEncoding.EncodeToString(
 		[]byte("HydraFlow")))
-	w.Header().Set("X-HydraFlow-ISP", ispName)
+	// NOTE: ISP name intentionally NOT sent in response headers.
+	// Exposing it would let network observers fingerprint HydraFlow traffic
+	// and reveal the user's detected ISP to anyone intercepting the response.
 }
 
 // ---------------------------------------------------------------------------
@@ -1698,10 +1701,11 @@ func (s *server) handleReport(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[telemetry] isp=%s protocol=%s status=%s", ispName, report.Protocol, report.Status)
 
+	// Do not reveal the detected ISP back to the client — an adversary could
+	// use this to map IPs to ISPs via the report endpoint.
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"status": "recorded",
-		"isp":    ispName,
 	})
 }
 
@@ -1733,12 +1737,12 @@ func (s *server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 	healthStatuses := s.health.getAll()
 	telemetrySnapshot := s.telemetry.getSnapshot()
 
-	// Gather ISP cache stats.
+	// Gather ISP cache stats (hashed IPs only — never expose raw IPs).
 	s.isp.mu.RLock()
 	ispCacheCount := len(s.isp.cache)
 	ispEntries := make(map[string]string, len(s.isp.cache))
 	for ip, entry := range s.isp.cache {
-		ispEntries[ip] = entry.ispName
+		ispEntries[hashIP(ip)] = entry.ispName
 	}
 	s.isp.mu.RUnlock()
 

@@ -74,7 +74,7 @@ func DefaultAuditLoggerConfig() AuditLoggerConfig {
 		LogPath:        "/var/log/hydraflow",
 		MaxFileSize:    50 * 1024 * 1024, // 50MB
 		MaxFiles:       10,
-		LogSecurityIPs: true,
+		LogSecurityIPs: false, // default to privacy-preserving; opt-in to log full IPs
 	}
 }
 

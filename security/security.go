@@ -499,14 +499,17 @@ func TLSConfigInsecure() *tls.Config {
 }
 
 // hashIPForLog creates a privacy-preserving hash of an IP for logging.
+// Uses a salted hash to prevent rainbow-table reversal of the IPv4 space.
 func hashIPForLog(ip string) string {
-	// Use first 8 chars of SHA256 for log entries.
-	h := sha256Short(ip)
-	return h
+	return sha256Short(ip)
 }
 
-// sha256Short returns the first 8 hex characters of the SHA-256 hash of s.
+// ipHashSalt is a compile-time salt mixed into IP hashes to prevent
+// rainbow-table reversal (the IPv4 space is only ~4 billion entries).
+const ipHashSalt = "hf-ip-log-salt-v1"
+
+// sha256Short returns the first 16 hex characters of the salted SHA-256 hash of s.
 func sha256Short(s string) string {
-	h := sha256.Sum256([]byte(s))
-	return fmt.Sprintf("%x", h[:4])
+	h := sha256.Sum256([]byte(ipHashSalt + s))
+	return fmt.Sprintf("%x", h[:8])
 }
