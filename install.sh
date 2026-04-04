@@ -61,6 +61,45 @@ SUB_PORT=10086
 STATS_PORT=10085
 
 LOG_DIR="/var/log/hydraflow"
+
+# Auto-detect free ports. If a default port is occupied by another process,
+# pick an alternative. This prevents conflicts with nginx, x-ui, etc.
+find_free_port() {
+    local port=$1
+    local max_attempts=10
+    # Check if port is free (no one listening, or only our previous install)
+    while [ $max_attempts -gt 0 ]; do
+        local pid_on_port
+        pid_on_port=$(ss -tlnp "sport = :${port}" 2>/dev/null | grep -v "^State" | head -1)
+        if [ -z "$pid_on_port" ]; then
+            echo "$port"
+            return 0
+        fi
+        # If it's our own xray from a previous install, it's fine
+        if echo "$pid_on_port" | grep -q "hydraflow\|/etc/hydraflow"; then
+            echo "$port"
+            return 0
+        fi
+        # Port occupied by something else — try next
+        port=$((port + 1000))
+        max_attempts=$((max_attempts - 1))
+    done
+    echo "$port"
+}
+
+auto_select_ports() {
+    REALITY_PORT=$(find_free_port ${REALITY_PORT})
+    WS_PORT=$(find_free_port ${WS_PORT})
+    SS_PORT=$(find_free_port ${SS_PORT})
+    SUB_PORT=$(find_free_port ${SUB_PORT})
+    STATS_PORT=$(find_free_port ${STATS_PORT})
+
+    # Warn if ports changed from defaults
+    [ "$REALITY_PORT" != "443" ] && warn "Port 443 occupied, using ${REALITY_PORT} for Reality"
+    [ "$WS_PORT" != "2053" ] && warn "Port 2053 occupied, using ${WS_PORT} for WebSocket"
+    [ "$SS_PORT" != "8388" ] && warn "Port 8388 occupied, using ${SS_PORT} for Shadowsocks"
+    [ "$SUB_PORT" != "10086" ] && warn "Port 10086 occupied, using ${SUB_PORT} for subscription"
+}
 XRAY_ASSET_DIR="/usr/local/share/xray"
 
 # =============================================================================
@@ -586,6 +625,9 @@ success "SNI domain: ${SNI_DOMAIN}"
 # =============================================================================
 INSTALL_STAGE="generating xray config"
 step "Generating xray-core configuration"
+
+# Auto-select free ports (avoids conflicts with nginx, x-ui, etc.)
+auto_select_ports
 
 mkdir -p "${LOG_DIR}"
 chmod 750 "${LOG_DIR}"
