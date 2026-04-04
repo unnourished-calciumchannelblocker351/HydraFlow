@@ -1,4 +1,7 @@
-<h1 align="center">🐉 HydraFlow</h1>
+<p align="center">
+  <img src="docs/assets/hydraflow-logo.svg" alt="HydraFlow" width="120"/>
+</p>
+<h1 align="center">HydraFlow</h1>
 
 <p align="center">
   <strong>Bypass internet censorship. Works in Russia, China, Iran, Turkey, and other countries.</strong>

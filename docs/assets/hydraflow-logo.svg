@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d4aa"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0891b2"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="g3" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00d4aa"/>
+      <stop offset="50%" stop-color="#0891b2"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+  </defs>
+  <!-- Shield shape -->
+  <path d="M256 48 L432 128 L432 280 C432 380 340 456 256 480 C172 456 80 380 80 280 L80 128 Z"
+        fill="#0a0e17" stroke="url(#g3)" stroke-width="8"/>
+  <!-- Three hydra heads (stylized arrows pointing up) -->
+  <!-- Left head -->
+  <path d="M160 320 L160 200 L120 240 L160 160 L200 240 L160 200"
+        stroke="url(#g1)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Center head (tallest) -->
+  <path d="M256 340 L256 180 L216 220 L256 120 L296 220 L256 180"
+        stroke="url(#g3)" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Right head -->
+  <path d="M352 320 L352 200 L312 240 L352 160 L392 240 L352 200"
+        stroke="url(#g2)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Connection base -->
+  <path d="M140 340 Q256 380 372 340" stroke="url(#g3)" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <!-- Flow lines (water/data) -->
+  <path d="M180 360 Q220 370 256 360 Q292 350 320 360" stroke="#00d4aa" stroke-width="2" fill="none" opacity="0.5"/>
+  <path d="M200 380 Q230 388 256 380 Q282 372 310 380" stroke="#0891b2" stroke-width="2" fill="none" opacity="0.4"/>
+</svg>
