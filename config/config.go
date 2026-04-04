@@ -26,6 +26,8 @@ const (
 	ModeStandalone Mode = "standalone"
 	Mode3XUI       Mode = "3xui"
 	ModeMarzban    Mode = "marzban"
+	ModeRemnawave  Mode = "remnawave"
+	ModeHiddify    Mode = "hiddify"
 )
 
 // Config is the top-level HydraFlow configuration.
@@ -38,6 +40,8 @@ type Config struct {
 	Standalone StandaloneConfig `yaml:"standalone"`
 	XUI        XUIConfig        `yaml:"xui"`
 	Marzban    MarzbanConfig    `yaml:"marzban"`
+	Remnawave  RemnawaveConfig  `yaml:"remnawave"`
+	Hiddify    HiddifyConfig    `yaml:"hiddify"`
 
 	Servers []ServerEntry `yaml:"servers"`
 	CDN     CDNConfig     `yaml:"cdn"`
@@ -58,6 +62,18 @@ type XUIConfig struct {
 
 // MarzbanConfig holds settings for Marzban integration mode.
 type MarzbanConfig struct {
+	APIURL   string `yaml:"api_url"`
+	APIToken string `yaml:"api_token"`
+}
+
+// RemnawaveConfig holds settings for Remnawave integration mode.
+type RemnawaveConfig struct {
+	APIURL   string `yaml:"api_url"`
+	APIToken string `yaml:"api_token"`
+}
+
+// HiddifyConfig holds settings for Hiddify Manager integration mode.
+type HiddifyConfig struct {
 	APIURL   string `yaml:"api_url"`
 	APIToken string `yaml:"api_token"`
 }
@@ -95,6 +111,12 @@ func DefaultConfig() *Config {
 		Marzban: MarzbanConfig{
 			APIURL: "http://localhost:8000",
 		},
+		Remnawave: RemnawaveConfig{
+			APIURL: "http://localhost:3000",
+		},
+		Hiddify: HiddifyConfig{
+			APIURL: "http://localhost:8001",
+		},
 	}
 }
 
@@ -120,12 +142,12 @@ func Load(path string) (*Config, error) {
 
 	// Validate mode.
 	switch cfg.Mode {
-	case ModeStandalone, Mode3XUI, ModeMarzban:
+	case ModeStandalone, Mode3XUI, ModeMarzban, ModeRemnawave, ModeHiddify:
 		// valid
 	case "":
 		cfg.Mode = ModeStandalone
 	default:
-		return nil, fmt.Errorf("unknown mode %q (must be standalone, 3xui, or marzban)", cfg.Mode)
+		return nil, fmt.Errorf("unknown mode %q (must be standalone, 3xui, marzban, remnawave, or hiddify)", cfg.Mode)
 	}
 
 	if cfg.Listen == "" {

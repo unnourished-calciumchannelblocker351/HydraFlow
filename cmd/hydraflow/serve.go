@@ -107,6 +107,16 @@ func cmdServe() {
 			logger.Error("marzban mode error", "error", err)
 			os.Exit(1)
 		}
+	case config.ModeRemnawave:
+		if err := serveRemnawave(ctx, cfg, engine, logger); err != nil {
+			logger.Error("remnawave mode error", "error", err)
+			os.Exit(1)
+		}
+	case config.ModeHiddify:
+		if err := serveHiddify(ctx, cfg, engine, logger); err != nil {
+			logger.Error("hiddify mode error", "error", err)
+			os.Exit(1)
+		}
 	default:
 		fmt.Fprintf(os.Stderr, "unknown mode: %s\n", cfg.Mode)
 		os.Exit(1)
@@ -230,6 +240,60 @@ func serveMarzban(ctx context.Context, cfg *config.Config, engine *smartsub.Engi
 
 	if err := provider.Start(); err != nil {
 		return fmt.Errorf("start Marzban provider: %w", err)
+	}
+	defer provider.Stop()
+
+	engine.SetNodes(provider.Nodes())
+	engine.StartHealthChecks(ctx, 5*time.Minute)
+
+	return startHTTPServer(ctx, cfg, engine, logger)
+}
+
+// serveRemnawave runs in Remnawave integration mode.
+func serveRemnawave(ctx context.Context, cfg *config.Config, engine *smartsub.Engine, logger *slog.Logger) error {
+	provider, err := integrations.NewRemnawaveProvider(integrations.RemnawaveConfig{
+		APIURL:       cfg.Remnawave.APIURL,
+		APIToken:     cfg.Remnawave.APIToken,
+		PollInterval: 30 * time.Second,
+		ServerIP:     detectServerIP(cfg.Listen),
+		Logger:       logger,
+		OnChange: func(nodes []smartsub.Node) {
+			engine.SetNodes(nodes)
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("init Remnawave provider: %w", err)
+	}
+
+	if err := provider.Start(); err != nil {
+		return fmt.Errorf("start Remnawave provider: %w", err)
+	}
+	defer provider.Stop()
+
+	engine.SetNodes(provider.Nodes())
+	engine.StartHealthChecks(ctx, 5*time.Minute)
+
+	return startHTTPServer(ctx, cfg, engine, logger)
+}
+
+// serveHiddify runs in Hiddify Manager integration mode.
+func serveHiddify(ctx context.Context, cfg *config.Config, engine *smartsub.Engine, logger *slog.Logger) error {
+	provider, err := integrations.NewHiddifyProvider(integrations.HiddifyConfig{
+		APIURL:       cfg.Hiddify.APIURL,
+		APIToken:     cfg.Hiddify.APIToken,
+		PollInterval: 30 * time.Second,
+		ServerIP:     detectServerIP(cfg.Listen),
+		Logger:       logger,
+		OnChange: func(nodes []smartsub.Node) {
+			engine.SetNodes(nodes)
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("init Hiddify provider: %w", err)
+	}
+
+	if err := provider.Start(); err != nil {
+		return fmt.Errorf("start Hiddify provider: %w", err)
 	}
 	defer provider.Stop()
 

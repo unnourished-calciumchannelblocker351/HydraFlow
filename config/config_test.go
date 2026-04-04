@@ -36,6 +36,12 @@ func TestDefaultConfig_HasCorrectDefaults(t *testing.T) {
 	if cfg.Marzban.APIURL != "http://localhost:8000" {
 		t.Fatalf("unexpected marzban API URL: %q", cfg.Marzban.APIURL)
 	}
+	if cfg.Remnawave.APIURL != "http://localhost:3000" {
+		t.Fatalf("unexpected remnawave API URL: %q", cfg.Remnawave.APIURL)
+	}
+	if cfg.Hiddify.APIURL != "http://localhost:8001" {
+		t.Fatalf("unexpected hiddify API URL: %q", cfg.Hiddify.APIURL)
+	}
 }
 
 func TestLoad_MissingFileReturnsDefaults(t *testing.T) {
@@ -176,6 +182,8 @@ func TestLoad_AllValidModes(t *testing.T) {
 		{"mode: standalone", ModeStandalone},
 		{"mode: 3xui", Mode3XUI},
 		{"mode: marzban", ModeMarzban},
+		{"mode: remnawave", ModeRemnawave},
+		{"mode: hiddify", ModeHiddify},
 	}
 
 	for _, tc := range modes {

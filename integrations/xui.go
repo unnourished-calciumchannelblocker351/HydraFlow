@@ -1,6 +1,7 @@
 // Package integrations provides adapters that read user and inbound data
-// from external panels (3x-ui, Marzban) and convert them into HydraFlow's
-// internal Node format for the smart subscription engine.
+// from external panels (3x-ui, Marzban, Remnawave, Hiddify, or any generic
+// REST API panel) and convert them into HydraFlow's internal Node format
+// for the smart subscription engine.
 package integrations
 
 import (
