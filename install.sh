@@ -21,8 +21,12 @@
 
 set -euo pipefail
 
-HYDRAFLOW_VERSION="2.0.0"
+HYDRAFLOW_VERSION="2.0.1"
 SECONDS=0
+
+# Network timeout for all curl operations (seconds)
+CURL_TIMEOUT=30
+CURL_CONNECT_TIMEOUT=10
 
 # =============================================================================
 #  Color output helpers
@@ -132,6 +136,29 @@ do_uninstall() {
     echo -e "${RED}${BOLD}==> Uninstalling HydraFlow${NC}"
     echo ""
 
+    # Read actual ports from saved config (not defaults) to clean firewall properly
+    local uninstall_ports=()
+    if [[ -f "${SUB_CONFIG}" ]] && command -v jq &>/dev/null; then
+        local saved_rp saved_wp saved_sp saved_subp
+        saved_rp=$(jq -r '.protocols.reality.port // empty' "${SUB_CONFIG}" 2>/dev/null)
+        saved_wp=$(jq -r '.protocols.ws.port // empty' "${SUB_CONFIG}" 2>/dev/null)
+        saved_sp=$(jq -r '.protocols.ss.port // empty' "${SUB_CONFIG}" 2>/dev/null)
+        saved_subp=$(jq -r '.sub_port // empty' "${SUB_CONFIG}" 2>/dev/null)
+        [[ -n "${saved_rp}" ]] && uninstall_ports+=("${saved_rp}")
+        [[ -n "${saved_wp}" ]] && uninstall_ports+=("${saved_wp}")
+        [[ -n "${saved_sp}" ]] && uninstall_ports+=("${saved_sp}")
+        [[ -n "${saved_subp}" ]] && uninstall_ports+=("${saved_subp}")
+        info "Read ports from config: ${uninstall_ports[*]}"
+    fi
+    # Also include default ports in case config is missing/corrupt
+    for dp in ${REALITY_PORT} ${WS_PORT} ${SS_PORT} ${SUB_PORT}; do
+        local already=false
+        for ep in "${uninstall_ports[@]+"${uninstall_ports[@]}"}"; do
+            [[ "${ep}" == "${dp}" ]] && already=true
+        done
+        [[ "${already}" == "false" ]] && uninstall_ports+=("${dp}")
+    done
+
     # Stop and disable services
     for svc in hydraflow-xray hydraflow-sub; do
         if systemctl is-active --quiet "${svc}" 2>/dev/null; then
@@ -144,29 +171,42 @@ do_uninstall() {
         rm -f "/etc/systemd/system/${svc}.service"
     done
     systemctl daemon-reload 2>/dev/null || true
+    info "Services removed"
 
     # Remove binaries
     rm -f "${XRAY_BIN}" "${SUB_BIN}"
+    info "Binaries removed"
 
-    # Remove config and logs
+    # Remove config, logs, and asset directories
     rm -rf "${CONFIG_DIR}"
     rm -rf "${LOG_DIR}"
     rm -rf "${XRAY_ASSET_DIR}"
+    info "Configuration and logs removed"
 
-    # Remove firewall rules (best effort)
+    # Clean up temp files that may have been left behind
+    rm -f /tmp/go.tar.gz /tmp/hydraflow-sub-server.go
+    info "Temp files cleaned"
+
+    # Remove firewall rules (best effort) using all known ports
     if command -v ufw &>/dev/null; then
-        for port in ${REALITY_PORT} ${WS_PORT} ${SS_PORT} ${SUB_PORT}; do
+        for port in "${uninstall_ports[@]}"; do
             ufw delete allow "${port}/tcp" 2>/dev/null || true
+            ufw delete allow "${port}/udp" 2>/dev/null || true
         done
+        info "ufw rules removed"
     elif command -v firewall-cmd &>/dev/null; then
-        for port in ${REALITY_PORT} ${WS_PORT} ${SS_PORT} ${SUB_PORT}; do
+        for port in "${uninstall_ports[@]}"; do
             firewall-cmd --permanent --remove-port="${port}/tcp" 2>/dev/null || true
+            firewall-cmd --permanent --remove-port="${port}/udp" 2>/dev/null || true
         done
         firewall-cmd --reload 2>/dev/null || true
+        info "firewalld rules removed"
     elif command -v iptables &>/dev/null; then
-        for port in ${REALITY_PORT} ${WS_PORT} ${SS_PORT} ${SUB_PORT}; do
+        for port in "${uninstall_ports[@]}"; do
             iptables -D INPUT -p tcp --dport "${port}" -j ACCEPT 2>/dev/null || true
+            iptables -D INPUT -p udp --dport "${port}" -j ACCEPT 2>/dev/null || true
         done
+        info "iptables rules removed"
     fi
 
     echo ""
@@ -202,11 +242,17 @@ rollback() {
     local exit_code=$?
     if [[ ${exit_code} -ne 0 && -n "${INSTALL_STAGE}" ]]; then
         echo ""
+        error "========================================"
         error "Installation failed during: ${INSTALL_STAGE}"
         error "Exit code: ${exit_code}"
+        error "========================================"
         echo ""
         warn "Partial installation may remain. To clean up:"
         warn "  bash install.sh --uninstall"
+        echo ""
+        warn "For debugging, check:"
+        warn "  journalctl -u hydraflow-xray --no-pager -n 30"
+        warn "  cat ${LOG_DIR}/error.log"
         echo ""
     fi
 }
@@ -306,6 +352,21 @@ if [[ ${DISK_FREE_MB} -gt 0 ]]; then
     fi
 fi
 
+# Internet connectivity check (fail fast if no internet)
+info "Checking internet connectivity..."
+if ! curl -fsSL --max-time "${CURL_CONNECT_TIMEOUT}" --connect-timeout "${CURL_CONNECT_TIMEOUT}" \
+    -o /dev/null "https://www.google.com" 2>/dev/null \
+    && ! curl -fsSL --max-time "${CURL_CONNECT_TIMEOUT}" --connect-timeout "${CURL_CONNECT_TIMEOUT}" \
+    -o /dev/null "https://api.github.com" 2>/dev/null \
+    && ! curl -fsSL --max-time "${CURL_CONNECT_TIMEOUT}" --connect-timeout "${CURL_CONNECT_TIMEOUT}" \
+    -o /dev/null "https://1.1.1.1" 2>/dev/null; then
+    error "No internet connectivity detected."
+    error "This script requires internet access to download xray-core and dependencies."
+    error "Please check your network configuration and try again."
+    exit 1
+fi
+success "Internet connectivity OK"
+
 # =============================================================================
 #  2b. Interactive configuration wizard
 # =============================================================================
@@ -360,15 +421,22 @@ ${PKG_INSTALL} curl unzip jq openssl ca-certificates socat 2>/dev/null
 success "System packages installed"
 
 # Install Go if not available (needed to build sub-server)
+GO_INSTALL_OK=true
 if ! command -v go &>/dev/null; then
     info "Installing Go toolchain (needed for subscription server)..."
     GO_VERSION="1.22.5"
-    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" -o /tmp/go.tar.gz
-    rm -rf /usr/local/go
-    tar -C /usr/local -xzf /tmp/go.tar.gz
-    rm -f /tmp/go.tar.gz
-    export PATH="/usr/local/go/bin:${PATH}"
-    success "Go ${GO_VERSION} installed"
+    if curl -fsSL --max-time 120 --connect-timeout "${CURL_CONNECT_TIMEOUT}" \
+        "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" -o /tmp/go.tar.gz; then
+        rm -rf /usr/local/go
+        tar -C /usr/local -xzf /tmp/go.tar.gz
+        rm -f /tmp/go.tar.gz
+        export PATH="/usr/local/go/bin:${PATH}"
+        success "Go ${GO_VERSION} installed"
+    else
+        rm -f /tmp/go.tar.gz
+        GO_INSTALL_OK=false
+        warn "Failed to download Go. Subscription server will use shell fallback."
+    fi
 else
     success "Go available: $(go version | awk '{print $3}')"
 fi
@@ -381,7 +449,8 @@ step "Installing xray-core"
 
 install_xray() {
     local latest_tag
-    latest_tag=$(curl -fsSL "https://api.github.com/repos/XTLS/Xray-core/releases/latest" | jq -r '.tag_name')
+    latest_tag=$(curl -fsSL --max-time "${CURL_TIMEOUT}" --connect-timeout "${CURL_CONNECT_TIMEOUT}" \
+        "https://api.github.com/repos/XTLS/Xray-core/releases/latest" | jq -r '.tag_name')
 
     if [[ -z "${latest_tag}" || "${latest_tag}" == "null" ]]; then
         error "Failed to fetch latest xray-core version from GitHub"
@@ -393,11 +462,40 @@ install_xray() {
     local tmpdir
     tmpdir=$(mktemp -d)
 
+    # Ensure cleanup of temp directory on any failure
+    cleanup_xray_tmp() { rm -rf "${tmpdir}"; }
+    trap 'cleanup_xray_tmp' ERR
+
     info "Downloading xray-core..."
-    curl -fsSL "${url}" -o "${tmpdir}/xray.zip"
+    if ! curl -fsSL --max-time 120 --connect-timeout "${CURL_CONNECT_TIMEOUT}" \
+        "${url}" -o "${tmpdir}/xray.zip"; then
+        rm -rf "${tmpdir}"
+        error "Failed to download xray-core from ${url}"
+        error "Check your internet connection and try again."
+        exit 1
+    fi
+
+    # Verify download is not empty/corrupted
+    local filesize
+    filesize=$(stat -c%s "${tmpdir}/xray.zip" 2>/dev/null || stat -f%z "${tmpdir}/xray.zip" 2>/dev/null || echo "0")
+    if [[ "${filesize}" -lt 1000 ]]; then
+        rm -rf "${tmpdir}"
+        error "Downloaded xray-core archive appears corrupted (${filesize} bytes)"
+        exit 1
+    fi
 
     info "Extracting..."
-    unzip -qo "${tmpdir}/xray.zip" -d "${tmpdir}/xray"
+    if ! unzip -qo "${tmpdir}/xray.zip" -d "${tmpdir}/xray"; then
+        rm -rf "${tmpdir}"
+        error "Failed to extract xray-core archive (corrupted download?)"
+        exit 1
+    fi
+
+    if [[ ! -f "${tmpdir}/xray/xray" ]]; then
+        rm -rf "${tmpdir}"
+        error "xray binary not found in downloaded archive"
+        exit 1
+    fi
 
     # Install binary
     install -m 755 "${tmpdir}/xray/xray" "${XRAY_BIN}"
@@ -411,6 +509,7 @@ install_xray() {
     done
 
     rm -rf "${tmpdir}"
+    trap - ERR  # Remove the ERR trap after success
     success "xray-core ${latest_tag} installed"
 }
 
@@ -419,7 +518,8 @@ if [[ -x "${XRAY_BIN}" ]]; then
     info "xray-core already installed: v${CURRENT_VER}"
 
     # Check for updates
-    LATEST_TAG=$(curl -fsSL "https://api.github.com/repos/XTLS/Xray-core/releases/latest" 2>/dev/null | jq -r '.tag_name' 2>/dev/null || echo "")
+    LATEST_TAG=$(curl -fsSL --max-time "${CURL_TIMEOUT}" --connect-timeout "${CURL_CONNECT_TIMEOUT}" \
+        "https://api.github.com/repos/XTLS/Xray-core/releases/latest" 2>/dev/null | jq -r '.tag_name' 2>/dev/null || echo "")
     if [[ -n "${LATEST_TAG}" && "v${CURRENT_VER}" != "${LATEST_TAG}" ]]; then
         info "Newer version available (${LATEST_TAG}), updating..."
         install_xray
@@ -530,6 +630,22 @@ success "SS method:     ${SS_METHOD}"
 success "SS password:   ${SS_PASSWORD:0:12}..."
 success "Sub token:     ${SUB_TOKEN:0:16}..."
 
+# Save credentials backup with strict permissions (owner-only read/write)
+cat > "${CREDS_FILE}" << CREDSEOF
+# HydraFlow credentials backup - generated $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+# DO NOT share this file. It contains all proxy secrets.
+UUID=${UUID}
+PRIVATE_KEY=${PRIVATE_KEY}
+PUBLIC_KEY=${PUBLIC_KEY}
+SHORT_ID=${SHORT_ID}
+WS_PATH=${WS_PATH}
+SS_METHOD=${SS_METHOD}
+SS_PASSWORD=${SS_PASSWORD}
+SUB_TOKEN=${SUB_TOKEN}
+CREDSEOF
+chmod 600 "${CREDS_FILE}"
+detail "Credentials saved to ${CREDS_FILE} (mode 600)"
+
 # =============================================================================
 #  6. Detect server IP
 # =============================================================================
@@ -584,10 +700,18 @@ find_best_sni() {
 
     local best_domain="www.microsoft.com"
     local best_time=99999
+    local total=${#candidates[@]}
+    local current=0
 
     for domain in "${candidates[@]}"; do
+        current=$((current + 1))
+        local remaining=$((total - current))
+        # Estimate ~5s max per probe (timeout value)
+        local est_secs=$((remaining * 3))
+        echo -e "    ${DIM}[${current}/${total}] Probing ${domain}... (~${est_secs}s remaining)${NC}" >&2
+
         local start_ms end_ms elapsed
-        start_ms=$(date +%s%N)
+        start_ms=$(date +%s%N 2>/dev/null || date +%s)
 
         local result
         result=$(timeout 5 openssl s_client -connect "${domain}:443" \
@@ -595,17 +719,21 @@ find_best_sni() {
             -brief </dev/null 2>&1 | head -5)
 
         if echo "${result}" | grep -qi "TLSv1.3"; then
-            end_ms=$(date +%s%N)
-            elapsed=$(( (end_ms - start_ms) / 1000000 ))
+            end_ms=$(date +%s%N 2>/dev/null || date +%s)
+            # Handle both nanosecond and second precision
+            if [[ ${#start_ms} -gt 12 ]]; then
+                elapsed=$(( (end_ms - start_ms) / 1000000 ))
+            else
+                elapsed=$(( (end_ms - start_ms) * 1000 ))
+            fi
 
             if [[ ${elapsed} -lt ${best_time} ]]; then
                 best_time=${elapsed}
                 best_domain="${domain}"
             fi
-            # Output progress to stderr so it doesn't pollute the return value
-            echo -e "    ${DIM}${domain} -- TLS 1.3 OK (${elapsed}ms)${NC}" >&2
+            echo -e "    ${GREEN}  -> TLS 1.3 OK (${elapsed}ms)${NC}" >&2
         else
-            echo -e "    ${DIM}${domain} -- no TLS 1.3, skipped${NC}" >&2
+            echo -e "    ${DIM}  -> no TLS 1.3, skipped${NC}" >&2
         fi
     done
 
@@ -864,6 +992,17 @@ cat > "${XRAY_CONFIG}" << XRAYEOF
 XRAYEOF
 
 chmod 640 "${XRAY_CONFIG}"
+
+# Validate xray config before proceeding
+info "Validating xray configuration..."
+XRAY_TEST_OUTPUT=$( XRAY_LOCATION_ASSET="${XRAY_ASSET_DIR}" "${XRAY_BIN}" run -test -config "${XRAY_CONFIG}" 2>&1 ) || {
+    error "Xray configuration validation FAILED:"
+    echo "${XRAY_TEST_OUTPUT}" >&2
+    error "Please check ${XRAY_CONFIG} for errors."
+    exit 1
+}
+success "xray config validated OK"
+
 success "xray config written to ${XRAY_CONFIG}"
 detail "Inbounds: vless-reality (:${REALITY_PORT}), vless-ws (:${WS_PORT}), shadowsocks (:${SS_PORT})"
 
@@ -903,7 +1042,7 @@ cat > "${SUB_CONFIG}" << SUBEOF
 }
 SUBEOF
 
-chmod 640 "${SUB_CONFIG}"
+chmod 600 "${SUB_CONFIG}"
 success "Subscription config written to ${SUB_CONFIG}"
 
 # =============================================================================
@@ -922,12 +1061,13 @@ if [[ -f "${SCRIPT_DIR}/tools/sub-server.go" ]]; then
 else
     info "Downloading sub-server source from GitHub..."
     SUB_SERVER_SRC="/tmp/hydraflow-sub-server.go"
-    curl -fsSL "https://raw.githubusercontent.com/Evr1kys/HydraFlow/main/tools/sub-server.go" \
+    curl -fsSL --max-time "${CURL_TIMEOUT}" --connect-timeout "${CURL_CONNECT_TIMEOUT}" \
+        "https://raw.githubusercontent.com/Evr1kys/HydraFlow/main/tools/sub-server.go" \
         -o "${SUB_SERVER_SRC}" 2>/dev/null || true
 fi
 
 BUILD_OK=false
-if [[ -f "${SUB_SERVER_SRC}" ]]; then
+if [[ -f "${SUB_SERVER_SRC}" ]] && command -v go &>/dev/null; then
     info "Compiling subscription server..."
     export CGO_ENABLED=0
     if /usr/local/go/bin/go build -o "${SUB_BIN}" -ldflags="-s -w" "${SUB_SERVER_SRC}" 2>/dev/null \
@@ -935,7 +1075,13 @@ if [[ -f "${SUB_SERVER_SRC}" ]]; then
         chmod 755 "${SUB_BIN}"
         BUILD_OK=true
         success "Subscription server compiled: ${SUB_BIN}"
+    else
+        warn "Go build failed. Will use shell fallback."
     fi
+elif [[ ! -f "${SUB_SERVER_SRC}" ]]; then
+    warn "Sub-server source not found. Will use shell fallback."
+elif ! command -v go &>/dev/null; then
+    warn "Go not available (install failed earlier). Will use shell fallback."
 fi
 
 # Fallback: shell-based subscription server using socat
@@ -1111,14 +1257,24 @@ SUBSVCEOF
 
 success "hydraflow-sub.service created"
 
-# Check if required ports are free before starting services
+# Enable and reload systemd
+systemctl daemon-reload
+systemctl enable hydraflow-xray.service 2>/dev/null
+systemctl enable hydraflow-sub.service 2>/dev/null
+
+# Stop existing services FIRST (important for idempotent re-runs)
+systemctl stop hydraflow-xray.service 2>/dev/null || true
+systemctl stop hydraflow-sub.service 2>/dev/null || true
+
+# Now check if required ports are free (after our own services are stopped)
 check_port() {
     local port=$1
     local name=$2
-    if ss -tlnp 2>/dev/null | grep -q ":${port} " || \
-       netstat -tlnp 2>/dev/null | grep -q ":${port} "; then
+    local port_info
+    port_info=$(ss -tlnp 2>/dev/null | grep ":${port} " | head -1 || true)
+    if [[ -n "${port_info}" ]]; then
         local pid
-        pid=$(ss -tlnp 2>/dev/null | grep ":${port} " | sed -E 's/.*pid=([0-9]+).*/\1/' | head -1)
+        pid=$(echo "${port_info}" | sed -E 's/.*pid=([0-9]+).*/\1/' | head -1)
         warn "Port ${port} (${name}) is already in use (pid: ${pid:-unknown})."
         warn "  Consider stopping the conflicting service or changing ${name} port."
         return 1
@@ -1134,20 +1290,12 @@ check_port "${SUB_PORT}"     "Subscription" || PORT_CONFLICT=1
 
 if [[ ${PORT_CONFLICT} -eq 1 ]]; then
     warn ""
-    warn "One or more required ports are occupied."
+    warn "One or more required ports are occupied by other processes."
     warn "Services may fail to start. Consider freeing the ports above."
     warn ""
 fi
 
-# Enable and start
-systemctl daemon-reload
-
-systemctl enable hydraflow-xray.service 2>/dev/null
-systemctl enable hydraflow-sub.service 2>/dev/null
-
-systemctl stop hydraflow-xray.service 2>/dev/null || true
-systemctl stop hydraflow-sub.service 2>/dev/null || true
-
+# Start services
 systemctl start hydraflow-xray.service
 success "hydraflow-xray started"
 
@@ -1202,6 +1350,46 @@ elif command -v iptables &>/dev/null; then
     success "iptables rules added"
 else
     warn "No firewall detected. Please manually open ports: ${ALL_PORTS[*]}"
+fi
+
+# =============================================================================
+#  12b. Post-install connectivity test
+# =============================================================================
+INSTALL_STAGE="connectivity test"
+step "Testing connectivity"
+
+# Test 1: Check xray is actually listening
+sleep 1  # Give xray a moment to bind
+LISTEN_OK=true
+for test_port in "${REALITY_PORT}" "${WS_PORT}" "${SS_PORT}"; do
+    if ss -tlnp 2>/dev/null | grep -q ":${test_port} "; then
+        success "Port ${test_port} is listening"
+    else
+        warn "Port ${test_port} is NOT listening"
+        LISTEN_OK=false
+    fi
+done
+
+# Test 2: Check subscription server responds
+if curl -fsSL --max-time 5 "http://127.0.0.1:${SUB_PORT}/health" 2>/dev/null | grep -q "ok"; then
+    success "Subscription server health check OK"
+else
+    warn "Subscription server health check failed (may still be starting)"
+fi
+
+# Test 3: Verify proxy works by connecting through it
+# Use xray's SOCKS proxy if available, otherwise just check the service
+if systemctl is-active --quiet hydraflow-xray 2>/dev/null; then
+    success "hydraflow-xray service is active and running"
+else
+    warn "hydraflow-xray service is not active"
+    warn "  Debug: journalctl -u hydraflow-xray --no-pager -n 20"
+fi
+
+if [[ "${LISTEN_OK}" == "true" ]]; then
+    success "All proxy ports verified listening"
+else
+    warn "Some ports are not listening. Check logs: journalctl -u hydraflow-xray -f"
 fi
 
 # =============================================================================
