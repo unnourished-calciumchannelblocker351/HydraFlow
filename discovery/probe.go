@@ -9,20 +9,20 @@ import (
 	"net"
 	"time"
 
-	"github.com/Evr1kys/HydraFlow/core"
+	
 )
 
 // Prober runs a suite of censorship detection tests against a target.
 type Prober struct {
 	target string
-	tests  []core.ProbeTest
+	tests  []ProbeTest
 }
 
 // NewProber creates a prober targeting the given host:port.
 func NewProber(target string) *Prober {
 	return &Prober{
 		target: target,
-		tests: []core.ProbeTest{
+		tests: []ProbeTest{
 			&PortReachabilityTest{},
 			&TLSFingerprintTest{},
 			&SNIFilteringTest{},
@@ -33,13 +33,13 @@ func NewProber(target string) *Prober {
 }
 
 // RunAll executes all probe tests and returns results.
-func (p *Prober) RunAll(ctx context.Context) ([]*core.ProbeResult, error) {
-	var results []*core.ProbeResult
+func (p *Prober) RunAll(ctx context.Context) ([]*ProbeResult, error) {
+	var results []*ProbeResult
 
 	for _, t := range p.tests {
 		result, err := t.Run(ctx, p.target)
 		if err != nil {
-			results = append(results, &core.ProbeResult{
+			results = append(results, &ProbeResult{
 				TestName:  t.Name(),
 				Success:   false,
 				Details:   map[string]string{"error": err.Error()},
@@ -59,12 +59,12 @@ type PortReachabilityTest struct{}
 func (t *PortReachabilityTest) Name() string    { return "port_reachability" }
 func (t *PortReachabilityTest) Weight() float64 { return 1.0 }
 
-func (t *PortReachabilityTest) Run(ctx context.Context, target string) (*core.ProbeResult, error) {
+func (t *PortReachabilityTest) Run(ctx context.Context, target string) (*ProbeResult, error) {
 	start := time.Now()
 
 	conn, err := net.DialTimeout("tcp", target, 5*time.Second)
 	if err != nil {
-		return &core.ProbeResult{
+		return &ProbeResult{
 			TestName:  t.Name(),
 			Success:   false,
 			Latency:   time.Since(start),
@@ -74,7 +74,7 @@ func (t *PortReachabilityTest) Run(ctx context.Context, target string) (*core.Pr
 	}
 	conn.Close()
 
-	return &core.ProbeResult{
+	return &ProbeResult{
 		TestName:  t.Name(),
 		Success:   true,
 		Latency:   time.Since(start),
@@ -89,7 +89,7 @@ type TLSFingerprintTest struct{}
 func (t *TLSFingerprintTest) Name() string    { return "tls_fingerprint" }
 func (t *TLSFingerprintTest) Weight() float64 { return 0.8 }
 
-func (t *TLSFingerprintTest) Run(ctx context.Context, target string) (*core.ProbeResult, error) {
+func (t *TLSFingerprintTest) Run(ctx context.Context, target string) (*ProbeResult, error) {
 	start := time.Now()
 
 	// Attempt TLS handshake with chrome-like fingerprint
@@ -100,7 +100,7 @@ func (t *TLSFingerprintTest) Run(ctx context.Context, target string) (*core.Prob
 		MaxVersion:         tls.VersionTLS13,
 	})
 	if err != nil {
-		return &core.ProbeResult{
+		return &ProbeResult{
 			TestName: t.Name(),
 			Success:  false,
 			Latency:  time.Since(start),
@@ -115,7 +115,7 @@ func (t *TLSFingerprintTest) Run(ctx context.Context, target string) (*core.Prob
 
 	state := conn.ConnectionState()
 
-	return &core.ProbeResult{
+	return &ProbeResult{
 		TestName: t.Name(),
 		Success:  true,
 		Latency:  time.Since(start),
@@ -139,7 +139,7 @@ type SNIFilteringTest struct {
 func (t *SNIFilteringTest) Name() string    { return "sni_filtering" }
 func (t *SNIFilteringTest) Weight() float64 { return 0.9 }
 
-func (t *SNIFilteringTest) Run(ctx context.Context, target string) (*core.ProbeResult, error) {
+func (t *SNIFilteringTest) Run(ctx context.Context, target string) (*ProbeResult, error) {
 	domains := t.TestDomains
 	if len(domains) == 0 {
 		domains = []string{
@@ -181,7 +181,7 @@ func (t *SNIFilteringTest) Run(ctx context.Context, target string) (*core.ProbeR
 		}
 	}
 
-	return &core.ProbeResult{
+	return &ProbeResult{
 		TestName:  t.Name(),
 		Success:   !allBlocked,
 		Details:   details,
@@ -195,7 +195,7 @@ type QUICAvailabilityTest struct{}
 func (t *QUICAvailabilityTest) Name() string    { return "quic_availability" }
 func (t *QUICAvailabilityTest) Weight() float64 { return 0.7 }
 
-func (t *QUICAvailabilityTest) Run(ctx context.Context, target string) (*core.ProbeResult, error) {
+func (t *QUICAvailabilityTest) Run(ctx context.Context, target string) (*ProbeResult, error) {
 	start := time.Now()
 
 	// Send a QUIC-like Initial packet and check for response
@@ -206,7 +206,7 @@ func (t *QUICAvailabilityTest) Run(ctx context.Context, target string) (*core.Pr
 
 	conn, err := net.DialUDP("udp", nil, addr)
 	if err != nil {
-		return &core.ProbeResult{
+		return &ProbeResult{
 			TestName:  t.Name(),
 			Success:   false,
 			Latency:   time.Since(start),
@@ -220,7 +220,7 @@ func (t *QUICAvailabilityTest) Run(ctx context.Context, target string) (*core.Pr
 	_ = conn.SetDeadline(time.Now().Add(3 * time.Second))
 	_, err = conn.Write([]byte{0x00})
 	if err != nil {
-		return &core.ProbeResult{
+		return &ProbeResult{
 			TestName:  t.Name(),
 			Success:   false,
 			Details:   map[string]string{"error": "udp write failed"},
@@ -228,7 +228,7 @@ func (t *QUICAvailabilityTest) Run(ctx context.Context, target string) (*core.Pr
 		}, nil
 	}
 
-	return &core.ProbeResult{
+	return &ProbeResult{
 		TestName:  t.Name(),
 		Success:   true,
 		Latency:   time.Since(start),
@@ -244,7 +244,7 @@ type FragmentBypassTest struct{}
 func (t *FragmentBypassTest) Name() string    { return "fragment_bypass" }
 func (t *FragmentBypassTest) Weight() float64 { return 0.6 }
 
-func (t *FragmentBypassTest) Run(ctx context.Context, target string) (*core.ProbeResult, error) {
+func (t *FragmentBypassTest) Run(ctx context.Context, target string) (*ProbeResult, error) {
 	// Test different fragment sizes to find what bypasses DPI
 	sizes := []int{1, 2, 5, 10, 50, 100, 200}
 	var working []int
@@ -261,7 +261,7 @@ func (t *FragmentBypassTest) Run(ctx context.Context, target string) (*core.Prob
 		details["optimal"] = fmt.Sprintf("%d", working[0])
 	}
 
-	return &core.ProbeResult{
+	return &ProbeResult{
 		TestName:  t.Name(),
 		Success:   len(working) > 0,
 		Details:   details,

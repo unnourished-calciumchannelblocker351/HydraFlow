@@ -12,6 +12,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,8 +23,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/Evr1kys/HydraFlow/subscription"
 )
 
 // hashIP returns the first 8 characters of the SHA-256 hex digest of an IP,
@@ -225,89 +224,9 @@ func (e *Engine) NodesForUser(email, clientIP string) []Node {
 	return nodes // if everything is "blocked", return all anyway
 }
 
-// SubscriptionForUser generates a subscription.Subscription for a user.
-func (e *Engine) SubscriptionForUser(email, clientIP string) *subscription.Subscription {
-	nodes := e.NodesForUser(email, clientIP)
-	if len(nodes) == 0 {
-		return nil
-	}
+// SubscriptionForUser generates a interface{} for a user.
 
-	sub := &subscription.Subscription{
-		Version: 1,
-		Server:  e.serverIP,
-		Updated: time.Now(),
-		TTL:     3600,
-	}
-
-	for i, n := range nodes {
-		pc := nodeToProtocolConfig(n, i)
-		sub.Protocols = append(sub.Protocols, pc)
-	}
-
-	return sub
-}
-
-// nodeToProtocolConfig converts a Node to subscription.ProtocolConfig.
-func nodeToProtocolConfig(n Node, rank int) subscription.ProtocolConfig {
-	label := "HydraFlow"
-	if n.ServerName != "" {
-		label += "-" + n.ServerName
-	}
-	label += "-" + formatProtocolName(n.Protocol)
-	if rank == 0 {
-		label += " (best)"
-	}
-
-	pc := subscription.ProtocolConfig{
-		Name:        label,
-		Priority:    rank,
-		Host:        n.Server,
-		Port:        n.Port,
-		UUID:        n.UUID,
-		SNI:         n.SNI,
-		PublicKey:   n.PublicKey,
-		ShortID:     n.ShortID,
-		SpiderX:     n.SpiderX,
-		Path:        n.Path,
-		CDN:         n.CDN,
-		Obfs:        n.Obfs,
-		Ports:       n.Ports,
-		Fingerprint: n.Fingerprint,
-	}
-
-	// Map protocol to transport+security.
-	switch n.Protocol {
-	case "reality":
-		pc.Transport = "tcp"
-		pc.Security = "reality"
-		if pc.Fingerprint == "" {
-			pc.Fingerprint = "chrome"
-		}
-	case "ws":
-		pc.Transport = "ws"
-		pc.Security = "tls"
-		if n.CDN != "" {
-			pc.Host = n.CDN
-		}
-	case "grpc":
-		pc.Transport = "grpc"
-		pc.Security = "tls"
-	case "xhttp":
-		pc.Transport = "xhttp"
-		pc.Security = "tls"
-	case "ss":
-		pc.Transport = "shadowsocks"
-		pc.Security = "none"
-	case "hysteria2":
-		pc.Transport = "quic"
-		pc.Security = "tls"
-	default:
-		pc.Transport = n.Protocol
-		pc.Security = n.Security
-	}
-
-	return pc
-}
+// nodeToProtocolConfig converts a Node to interface{}.
 
 // formatProtocolName produces a clean display name for a protocol.
 func formatProtocolName(name string) string {
@@ -379,31 +298,19 @@ func (e *Engine) handleSubscription(w http.ResponseWriter, r *http.Request) {
 	}
 
 	clientIP := extractClientIP(r)
-
-	// If no email, serve all enabled nodes (single-user mode or admin).
-	var sub *subscription.Subscription
-	if email != "" {
-		sub = e.SubscriptionForUser(email, clientIP)
-	} else {
-		sub = e.subscriptionForAll(clientIP)
-	}
-
-	if sub == nil || len(sub.Protocols) == 0 {
+	nodes := e.NodesForUser(email, clientIP)
+	if len(nodes) == 0 {
 		http.Error(w, "no nodes available", http.StatusNotFound)
 		return
 	}
 
-	// Detect ISP and log.
 	ispName, _ := e.isp.Lookup(clientIP)
 	e.logger.Info("subscription request",
 		"client_ip", hashIP(clientIP),
 		"isp", ispName,
-		"email", email,
-		"nodes", len(sub.Protocols),
-		"format", detectFormat(r),
+		"nodes", len(nodes),
 	)
 
-	// Set common headers.
 	w.Header().Set("Subscription-UserInfo", fmt.Sprintf(
 		"upload=0; download=0; total=0; expire=%d",
 		time.Now().Add(30*24*time.Hour).Unix(),
@@ -411,93 +318,22 @@ func (e *Engine) handleSubscription(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Profile-Update-Interval", "6")
 	w.Header().Set("X-HydraFlow-ISP", ispName)
 
-	// Serve in requested format.
-	format := detectFormat(r)
-	switch format {
-	case "clash":
-		data, err := subscription.ExportClashFull(sub)
-		if err != nil {
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
-		w.Header().Set("Content-Disposition", "attachment; filename=\"clash.yml\"")
-		w.Write(data)
-	case "singbox":
-		data, err := subscription.ExportSingBoxFull(sub)
-		if err != nil {
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Header().Set("Content-Disposition", "attachment; filename=\"singbox.json\"")
-		w.Write(data)
-	default:
-		// V2Ray base64 (most compatible default).
-		data := subscription.ExportV2RayFull(sub)
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Header().Set("Content-Disposition", "attachment; filename=\"v2ray.txt\"")
-		w.Write([]byte(data))
-	}
-}
-
-// subscriptionForAll builds a subscription with all enabled nodes (no email filter).
-func (e *Engine) subscriptionForAll(clientIP string) *subscription.Subscription {
-	e.mu.RLock()
-	allNodes := make([]Node, 0)
-	for _, n := range e.nodes {
-		if n.Enabled {
-			allNodes = append(allNodes, n)
+	// Generate V2Ray base64 links from nodes directly.
+	var links []string
+	for _, n := range nodes {
+		if n.Protocol == "vless" || n.Protocol == "reality" || n.Protocol == "" {
+			link := fmt.Sprintf("vless://%s@%s:%d?type=tcp&security=reality&sni=%s&fp=chrome&pbk=%s&sid=%s&flow=%s#%s",
+				n.UUID, n.Server, n.Port, n.SNI, n.PublicKey, n.ShortID, n.Flow, n.Name)
+			links = append(links, link)
 		}
 	}
-	e.mu.RUnlock()
-
-	if len(allNodes) == 0 {
-		return nil
+	if len(links) == 0 {
+		http.Error(w, "no links available", http.StatusNotFound)
+		return
 	}
-
-	ispName, _ := e.isp.Lookup(clientIP)
-	priority := GetISPPriority(ispName)
-
-	// Sort by ISP priority.
-	priorityIndex := make(map[string]int)
-	for i, p := range priority {
-		priorityIndex[p] = i
-		switch p {
-		case "ws-cdn":
-			priorityIndex["ws"] = i
-		case "grpc-cdn":
-			priorityIndex["grpc"] = i
-		}
-	}
-
-	sort.SliceStable(allNodes, func(i, j int) bool {
-		iUp := e.health.IsUp(allNodes[i].Server, allNodes[i].Port)
-		jUp := e.health.IsUp(allNodes[j].Server, allNodes[j].Port)
-		if iUp != jUp {
-			return iUp
-		}
-		iPri, iOk := priorityIndex[allNodes[i].Protocol]
-		jPri, jOk := priorityIndex[allNodes[j].Protocol]
-		if iOk && jOk {
-			return iPri < jPri
-		}
-		if iOk {
-			return true
-		}
-		return false
-	})
-
-	sub := &subscription.Subscription{
-		Version: 1,
-		Server:  e.serverIP,
-		Updated: time.Now(),
-		TTL:     3600,
-	}
-	for i, n := range allNodes {
-		sub.Protocols = append(sub.Protocols, nodeToProtocolConfig(n, i))
-	}
-	return sub
+	encoded := base64.StdEncoding.EncodeToString([]byte(strings.Join(links, "\n")))
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write([]byte(encoded))
 }
 
 // handleReport processes anonymous telemetry reports from clients.
@@ -1011,16 +847,16 @@ func NewTelemetryStore() *TelemetryStore {
 
 // knownProtocols is the set of valid protocol names accepted in telemetry reports.
 var knownTelemetryProtocols = map[string]bool{
-	"reality":    true,
-	"ws":         true,
-	"ws-cdn":     true,
-	"grpc":       true,
-	"grpc-cdn":   true,
-	"xhttp":      true,
-	"ss":         true,
-	"hysteria2":  true,
-	"shadowtls":  true,
-	"chain":      true,
+	"reality":   true,
+	"ws":        true,
+	"ws-cdn":    true,
+	"grpc":      true,
+	"grpc-cdn":  true,
+	"xhttp":     true,
+	"ss":        true,
+	"hysteria2": true,
+	"shadowtls": true,
+	"chain":     true,
 }
 
 // Record stores a telemetry report. Unknown protocol names are silently rejected.
