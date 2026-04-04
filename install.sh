@@ -1007,6 +1007,135 @@ success "xray config written to ${XRAY_CONFIG}"
 detail "Inbounds: vless-reality (:${REALITY_PORT}), vless-ws (:${WS_PORT}), shadowsocks (:${SS_PORT})"
 
 # =============================================================================
+#  8b. Optional WARP integration for streaming services
+# =============================================================================
+INSTALL_STAGE="WARP setup"
+step "Cloudflare WARP Integration"
+
+WARP_ENABLED=false
+
+if [[ "${AUTO_YES}" == "true" ]]; then
+    info "Non-interactive mode: skipping WARP setup"
+else
+    echo ""
+    echo -e "  ${BOLD}WARP routes streaming traffic through Cloudflare IPs.${NC}"
+    echo -e "  ${DIM}This helps access Netflix, ChatGPT, Spotify, etc.${NC}"
+    echo -e "  ${DIM}that may block VPS/datacenter IP addresses.${NC}"
+    echo ""
+    read -p "  Enable WARP for streaming services? (y/n): " ENABLE_WARP
+    if [[ "$ENABLE_WARP" == "y" || "$ENABLE_WARP" == "Y" ]]; then
+        WARP_ENABLED=true
+    fi
+fi
+
+if [[ "${WARP_ENABLED}" == "true" ]]; then
+    info "Registering with Cloudflare WARP..."
+
+    # Generate WireGuard keypair using xray
+    WARP_PRIVKEY=$(openssl rand -base64 32 2>/dev/null | head -c 44)
+    # For a proper WARP registration we need curl to call the Cloudflare API.
+    WARP_REG_RESPONSE=$(curl -fsSL --max-time 15 --connect-timeout "${CURL_CONNECT_TIMEOUT}" \
+        -X POST "https://api.cloudflareclient.com/v0a2158/reg" \
+        -H "Content-Type: application/json" \
+        -H "User-Agent: HydraFlow/2.0" \
+        -H "CF-Client-Version: a-6.11-2223" \
+        -d "{\"key\":\"${WARP_PRIVKEY}\",\"install_id\":\"\",\"fcm_token\":\"\",\"type\":\"Linux\",\"model\":\"HydraFlow\",\"locale\":\"en_US\"}" \
+        2>/dev/null || echo "")
+
+    if [[ -n "${WARP_REG_RESPONSE}" ]] && echo "${WARP_REG_RESPONSE}" | jq -e '.id' &>/dev/null; then
+        WARP_DEVICE_ID=$(echo "${WARP_REG_RESPONSE}" | jq -r '.id')
+        WARP_TOKEN=$(echo "${WARP_REG_RESPONSE}" | jq -r '.token')
+        WARP_PEER_PUB=$(echo "${WARP_REG_RESPONSE}" | jq -r '.config.peers[0].public_key')
+        WARP_ENDPOINT=$(echo "${WARP_REG_RESPONSE}" | jq -r '.config.peers[0].endpoint.v4 // "engage.cloudflareclient.com:2408"')
+        WARP_IPV4=$(echo "${WARP_REG_RESPONSE}" | jq -r '.config.interface.addresses.v4 // "172.16.0.2/32"')
+        WARP_IPV6=$(echo "${WARP_REG_RESPONSE}" | jq -r '.config.interface.addresses.v6 // "fd01::2/128"')
+        WARP_CLIENT_ID=$(echo "${WARP_REG_RESPONSE}" | jq -r '.config.client_id // ""')
+
+        # Compute reserved bytes from client_id (base64 decode to 3 bytes)
+        if [[ -n "${WARP_CLIENT_ID}" ]]; then
+            WARP_RESERVED=$(echo -n "${WARP_CLIENT_ID}" | base64 -d 2>/dev/null | od -An -tu1 | tr -s ' ' ',' | sed 's/^,//;s/,$//')
+        else
+            WARP_RESERVED="0,0,0"
+        fi
+
+        success "WARP registered: device=${WARP_DEVICE_ID:0:8}..."
+        success "WARP endpoint: ${WARP_ENDPOINT}"
+
+        # Inject WARP outbound into xray config
+        WARP_OUTBOUND='{
+          "tag": "warp-out",
+          "protocol": "wireguard",
+          "settings": {
+            "secretKey": "'"${WARP_PRIVKEY}"'",
+            "address": ["'"${WARP_IPV4}"'", "'"${WARP_IPV6}"'"],
+            "peers": [{"publicKey": "'"${WARP_PEER_PUB}"'", "endpoint": "'"${WARP_ENDPOINT}"'"}],
+            "reserved": ['"${WARP_RESERVED}"'],
+            "mtu": 1280
+          }
+        }'
+
+        WARP_RULE='{
+          "type": "field",
+          "outboundTag": "warp-out",
+          "domain": [
+            "domain:netflix.com", "domain:netflix.net", "domain:nflxvideo.net",
+            "domain:nflximg.net", "domain:nflxso.net", "domain:nflxext.com",
+            "domain:openai.com", "domain:chatgpt.com", "domain:oaiusercontent.com",
+            "domain:oaistatic.com",
+            "domain:spotify.com", "domain:spotifycdn.com", "domain:scdn.co",
+            "domain:disneyplus.com", "domain:dssott.com", "domain:bamgrid.com",
+            "domain:hulu.com", "domain:hulustream.com",
+            "domain:youtube.com", "domain:googlevideo.com", "domain:ytimg.com",
+            "domain:anthropic.com", "domain:claude.ai",
+            "domain:gemini.google.com"
+          ]
+        }'
+
+        # Use jq to inject WARP outbound and routing rule into xray config.
+        TEMP_CONFIG=$(mktemp)
+        jq --argjson warp_ob "${WARP_OUTBOUND}" --argjson warp_rule "${WARP_RULE}" \
+            '.outbounds += [$warp_ob] | .routing.rules = [$warp_rule] + .routing.rules' \
+            "${XRAY_CONFIG}" > "${TEMP_CONFIG}" 2>/dev/null
+
+        if [[ -s "${TEMP_CONFIG}" ]]; then
+            mv "${TEMP_CONFIG}" "${XRAY_CONFIG}"
+            chmod 640 "${XRAY_CONFIG}"
+
+            # Re-validate config with WARP
+            if XRAY_LOCATION_ASSET="${XRAY_ASSET_DIR}" "${XRAY_BIN}" run -test -config "${XRAY_CONFIG}" 2>/dev/null; then
+                success "WARP outbound added to xray config"
+                detail "Routing: Netflix, ChatGPT, Spotify, YouTube -> WARP"
+            else
+                warn "WARP config validation failed, reverting..."
+                WARP_ENABLED=false
+                # Regenerate config without WARP (it was already validated above)
+                jq 'del(.outbounds[] | select(.tag == "warp-out")) | .routing.rules |= [.[] | select(.outboundTag != "warp-out")]' \
+                    "${XRAY_CONFIG}" > "${TEMP_CONFIG}" 2>/dev/null && mv "${TEMP_CONFIG}" "${XRAY_CONFIG}"
+                chmod 640 "${XRAY_CONFIG}"
+            fi
+        else
+            rm -f "${TEMP_CONFIG}"
+            warn "Failed to inject WARP config (jq error). Continuing without WARP."
+            WARP_ENABLED=false
+        fi
+
+        # Save WARP credentials
+        cat >> "${CREDS_FILE}" << WARPCREDSEOF
+WARP_ENABLED=true
+WARP_DEVICE_ID=${WARP_DEVICE_ID}
+WARP_PEER_PUB=${WARP_PEER_PUB}
+WARP_ENDPOINT=${WARP_ENDPOINT}
+WARPCREDSEOF
+
+    else
+        warn "WARP registration failed (Cloudflare API unreachable). Continuing without WARP."
+        WARP_ENABLED=false
+    fi
+else
+    info "WARP integration skipped."
+fi
+
+# =============================================================================
 #  9. Generate subscription config
 # =============================================================================
 INSTALL_STAGE="generating subscription config"

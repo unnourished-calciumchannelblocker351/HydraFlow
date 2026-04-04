@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"html/template"
 	"io"
 	"log"
 	"net"
@@ -581,6 +582,122 @@ func (ts *telemetryStore) getSnapshot() map[string]*ispTelemetry {
 }
 
 // ---------------------------------------------------------------------------
+// Subscription fetch tracking
+// ---------------------------------------------------------------------------
+
+// subFetchEntry records a single subscription fetch event.
+type subFetchEntry struct {
+	Timestamp time.Time `json:"timestamp"`
+	ISP       string    `json:"isp"`
+	Format    string    `json:"format"`
+	IPHash    string    `json:"ip_hash"`
+}
+
+// subFetchStore holds subscription fetch statistics.
+type subFetchStore struct {
+	mu      sync.RWMutex
+	entries []subFetchEntry
+}
+
+func newSubFetchStore() *subFetchStore {
+	return &subFetchStore{
+		entries: make([]subFetchEntry, 0, 256),
+	}
+}
+
+// record logs a subscription fetch event.
+func (sf *subFetchStore) record(ipHash, isp, format string) {
+	sf.mu.Lock()
+	defer sf.mu.Unlock()
+	// Cap at 10000 entries to prevent unbounded growth.
+	if len(sf.entries) >= 10000 {
+		sf.entries = sf.entries[len(sf.entries)-5000:]
+	}
+	sf.entries = append(sf.entries, subFetchEntry{
+		Timestamp: time.Now().UTC(),
+		ISP:       isp,
+		Format:    format,
+		IPHash:    ipHash,
+	})
+}
+
+// subFetchStats is the aggregated view returned by the stats endpoint.
+type subFetchStats struct {
+	TotalFetches  int                       `json:"total_fetches"`
+	ByUser        map[string]*userFetchStat `json:"by_user"`
+	ByISP         map[string]int            `json:"by_isp"`
+	ByFormat      map[string]int            `json:"by_format"`
+	RecentFetches []subFetchEntry           `json:"recent_fetches"`
+}
+
+type userFetchStat struct {
+	Count  int      `json:"count"`
+	ISPs   []string `json:"isps"`
+	Formats []string `json:"formats"`
+	LastSeen time.Time `json:"last_seen"`
+}
+
+// getStats returns aggregated subscription fetch statistics.
+func (sf *subFetchStore) getStats() *subFetchStats {
+	sf.mu.RLock()
+	defer sf.mu.RUnlock()
+
+	stats := &subFetchStats{
+		TotalFetches: len(sf.entries),
+		ByUser:       make(map[string]*userFetchStat),
+		ByISP:        make(map[string]int),
+		ByFormat:     make(map[string]int),
+	}
+
+	for _, e := range sf.entries {
+		// Per-user stats
+		us, ok := stats.ByUser[e.IPHash]
+		if !ok {
+			us = &userFetchStat{}
+			stats.ByUser[e.IPHash] = us
+		}
+		us.Count++
+		us.LastSeen = e.Timestamp
+		// Track unique ISPs
+		found := false
+		for _, isp := range us.ISPs {
+			if isp == e.ISP {
+				found = true
+				break
+			}
+		}
+		if !found {
+			us.ISPs = append(us.ISPs, e.ISP)
+		}
+		// Track unique formats
+		found = false
+		for _, f := range us.Formats {
+			if f == e.Format {
+				found = true
+				break
+			}
+		}
+		if !found {
+			us.Formats = append(us.Formats, e.Format)
+		}
+
+		stats.ByISP[e.ISP]++
+		stats.ByFormat[e.Format]++
+	}
+
+	// Include last 50 fetches.
+	start := len(sf.entries) - 50
+	if start < 0 {
+		start = 0
+	}
+	recent := make([]subFetchEntry, len(sf.entries)-start)
+	copy(recent, sf.entries[start:])
+	stats.RecentFetches = recent
+
+	return stats
+}
+
+// ---------------------------------------------------------------------------
 // Global server state
 // ---------------------------------------------------------------------------
 
@@ -622,6 +739,7 @@ type server struct {
 	health        *protocolHealth
 	telemetry     *telemetryStore
 	reportLimiter *reportRateLimiter
+	subFetches    *subFetchStore
 	startTime     time.Time
 }
 
@@ -644,6 +762,7 @@ func main() {
 		health:        newProtocolHealth(),
 		telemetry:     newTelemetryStore(),
 		reportLimiter: newReportRateLimiter(),
+		subFetches:    newSubFetchStore(),
 		startTime:     time.Now(),
 	}
 
@@ -663,6 +782,7 @@ func main() {
 	})
 
 	// Admin status page: /admin/{token}/status
+	// Admin stats page:  /admin/{token}/stats
 	mux.HandleFunc("/admin/", func(w http.ResponseWriter, r *http.Request) {
 		srv.handleAdmin(w, r)
 	})
@@ -766,10 +886,15 @@ func (s *server) handleSubscription(w http.ResponseWriter, r *http.Request) {
 	// Step 3: Determine output format.
 	format := detectFormat(r)
 
-	// Step 4: Set common headers.
+	// Step 4: Log subscription fetch for tracking.
+	if s.subFetches != nil {
+		s.subFetches.record(hashIP(clientIP), ispName, format)
+	}
+
+	// Step 5: Set common headers.
 	s.setSubHeaders(w, ispName)
 
-	// Step 5: Serve in requested format.
+	// Step 6: Serve in requested format.
 	switch format {
 	case "clash":
 		s.serveClash(w, ordered, ispName)
@@ -777,6 +902,10 @@ func (s *server) handleSubscription(w http.ResponseWriter, r *http.Request) {
 		s.serveSingBox(w, ordered, ispName)
 	case "json":
 		s.serveJSON(w, ordered, ispName, ispInfo)
+	case "xray-json":
+		s.serveXrayJSON(w, ordered, ispName)
+	case "html":
+		s.serveHTML(w, r, ordered, ispName)
 	default:
 		s.serveV2Ray(w, ordered, ispName)
 	}
@@ -941,6 +1070,8 @@ func detectFormat(r *http.Request) string {
 			return "v2ray"
 		case "json":
 			return "json"
+		case "xray-json", "xray", "xrayjson":
+			return "xray-json"
 		}
 	}
 
@@ -955,9 +1086,22 @@ func detectFormat(r *http.Request) string {
 		strings.Contains(ua, "nekoray") || strings.Contains(ua, "nekobox") ||
 		strings.Contains(ua, "streisand") || strings.Contains(ua, "shadowrocket"):
 		return "v2ray"
+	// Browser detection — show HTML page with QR codes and instructions.
+	case strings.Contains(ua, "mozilla") || strings.Contains(ua, "chrome") ||
+		strings.Contains(ua, "safari") || strings.Contains(ua, "firefox") ||
+		strings.Contains(ua, "edge") || strings.Contains(ua, "opera"):
+		return "html"
 	}
 
 	return "v2ray"
+}
+
+// isBrowserUA returns true if the User-Agent string looks like a browser.
+func isBrowserUA(ua string) bool {
+	ua = strings.ToLower(ua)
+	return strings.Contains(ua, "mozilla") || strings.Contains(ua, "chrome") ||
+		strings.Contains(ua, "safari") || strings.Contains(ua, "firefox") ||
+		strings.Contains(ua, "edge") || strings.Contains(ua, "opera")
 }
 
 // ---------------------------------------------------------------------------
@@ -965,11 +1109,14 @@ func detectFormat(r *http.Request) string {
 // ---------------------------------------------------------------------------
 
 func (s *server) setSubHeaders(w http.ResponseWriter, ispName string) {
-	w.Header().Set("Subscription-UserInfo", fmt.Sprintf(
+	// Subscription-Userinfo: traffic and expiry data (100GB quota, 30-day expiry).
+	w.Header().Set("Subscription-Userinfo", fmt.Sprintf(
 		"upload=0; download=0; total=107374182400; expire=%d",
 		time.Now().Add(30*24*time.Hour).Unix(),
 	))
+	// Profile-Update-Interval: how often (hours) clients should re-fetch.
 	w.Header().Set("Profile-Update-Interval", "6")
+	// Profile-Title: display name in client apps.
 	w.Header().Set("Profile-Title", "base64:"+base64.StdEncoding.EncodeToString(
 		[]byte("HydraFlow")))
 	// NOTE: ISP name intentionally NOT sent in response headers.
@@ -1649,6 +1796,425 @@ func (s *server) serveJSON(w http.ResponseWriter, protocols []orderedProtocol, i
 }
 
 // ---------------------------------------------------------------------------
+// Xray JSON full client config format
+// ---------------------------------------------------------------------------
+
+func (s *server) serveXrayJSON(w http.ResponseWriter, protocols []orderedProtocol, ispName string) {
+	outbounds := make([]map[string]interface{}, 0, len(protocols)+2)
+
+	// Add proxy outbounds for each protocol.
+	for _, p := range protocols {
+		ob := s.buildXrayOutbound(p, ispName)
+		if ob != nil {
+			outbounds = append(outbounds, ob)
+		}
+	}
+
+	// System outbounds.
+	outbounds = append(outbounds,
+		map[string]interface{}{
+			"tag":      "direct",
+			"protocol": "freedom",
+			"settings": map[string]interface{}{},
+		},
+		map[string]interface{}{
+			"tag":      "block",
+			"protocol": "blackhole",
+			"settings": map[string]interface{}{
+				"response": map[string]string{"type": "http"},
+			},
+		},
+	)
+
+	config := map[string]interface{}{
+		"log": map[string]interface{}{
+			"loglevel": "warning",
+		},
+		"dns": map[string]interface{}{
+			"servers": []interface{}{
+				map[string]interface{}{
+					"address": "https://dns.google/dns-query",
+					"domains": []string{"geosite:geolocation-!cn"},
+				},
+				"localhost",
+			},
+		},
+		"inbounds": []map[string]interface{}{
+			{
+				"tag":      "socks-in",
+				"protocol": "socks",
+				"listen":   "127.0.0.1",
+				"port":     10808,
+				"settings": map[string]interface{}{
+					"udp": true,
+				},
+			},
+			{
+				"tag":      "http-in",
+				"protocol": "http",
+				"listen":   "127.0.0.1",
+				"port":     10809,
+			},
+		},
+		"outbounds": outbounds,
+		"routing": map[string]interface{}{
+			"domainStrategy": "IPIfNonMatch",
+			"rules": []map[string]interface{}{
+				{
+					"type":        "field",
+					"outboundTag": "direct",
+					"domain": []string{
+						"geosite:category-ru",
+					},
+				},
+				{
+					"type":        "field",
+					"outboundTag": "direct",
+					"ip":          []string{"geoip:ru", "geoip:private"},
+				},
+				{
+					"type":        "field",
+					"outboundTag": "block",
+					"domain":      []string{"geosite:category-ads-all"},
+				},
+			},
+		},
+	}
+
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"xray-config.json\"")
+	w.Write(data)
+}
+
+// buildXrayOutbound creates a single xray-core outbound for a protocol.
+func (s *server) buildXrayOutbound(p orderedProtocol, ispName string) map[string]interface{} {
+	cfg := p.Config
+	serverIP := s.cfg.ServerIP
+
+	switch p.Name {
+	case "reality":
+		return map[string]interface{}{
+			"tag":      p.Label,
+			"protocol": "vless",
+			"settings": map[string]interface{}{
+				"vnext": []map[string]interface{}{
+					{
+						"address": serverIP,
+						"port":    cfg.Port,
+						"users": []map[string]interface{}{
+							{
+								"id":         cfg.UUID,
+								"encryption": "none",
+								"flow":       coalesce(cfg.Flow, "xtls-rprx-vision"),
+							},
+						},
+					},
+				},
+			},
+			"streamSettings": map[string]interface{}{
+				"network":  "tcp",
+				"security": "reality",
+				"realitySettings": map[string]interface{}{
+					"serverName":  cfg.SNI,
+					"fingerprint": coalesce(cfg.Fingerprint, "chrome"),
+					"publicKey":   cfg.PublicKey,
+					"shortId":     cfg.ShortID,
+				},
+			},
+		}
+
+	case "ws":
+		host := coalesce(cfg.Host, serverIP)
+		return map[string]interface{}{
+			"tag":      p.Label,
+			"protocol": "vless",
+			"settings": map[string]interface{}{
+				"vnext": []map[string]interface{}{
+					{
+						"address": host,
+						"port":    cfg.Port,
+						"users": []map[string]interface{}{
+							{
+								"id":         cfg.UUID,
+								"encryption": "none",
+							},
+						},
+					},
+				},
+			},
+			"streamSettings": map[string]interface{}{
+				"network":  "ws",
+				"security": "tls",
+				"tlsSettings": map[string]interface{}{
+					"serverName":  coalesce(cfg.SNI, host),
+					"fingerprint": coalesce(cfg.Fingerprint, "chrome"),
+				},
+				"wsSettings": map[string]interface{}{
+					"path":    cfg.Path,
+					"headers": map[string]string{"Host": host},
+				},
+			},
+		}
+
+	case "grpc":
+		host := coalesce(cfg.Host, serverIP)
+		return map[string]interface{}{
+			"tag":      p.Label,
+			"protocol": "vless",
+			"settings": map[string]interface{}{
+				"vnext": []map[string]interface{}{
+					{
+						"address": host,
+						"port":    cfg.Port,
+						"users": []map[string]interface{}{
+							{
+								"id":         cfg.UUID,
+								"encryption": "none",
+							},
+						},
+					},
+				},
+			},
+			"streamSettings": map[string]interface{}{
+				"network":  "grpc",
+				"security": "tls",
+				"tlsSettings": map[string]interface{}{
+					"serverName":  coalesce(cfg.SNI, host),
+					"fingerprint": coalesce(cfg.Fingerprint, "chrome"),
+				},
+				"grpcSettings": map[string]interface{}{
+					"serviceName": cfg.ServiceName,
+				},
+			},
+		}
+
+	case "ss":
+		method := coalesce(cfg.Method, "2022-blake3-aes-256-gcm")
+		return map[string]interface{}{
+			"tag":      p.Label,
+			"protocol": "shadowsocks",
+			"settings": map[string]interface{}{
+				"servers": []map[string]interface{}{
+					{
+						"address":  serverIP,
+						"port":     cfg.Port,
+						"method":   method,
+						"password": cfg.Password,
+					},
+				},
+			},
+		}
+
+	case "hysteria2":
+		return map[string]interface{}{
+			"tag":      p.Label,
+			"protocol": "hysteria2",
+			"settings": map[string]interface{}{
+				"server":   fmt.Sprintf("%s:%d", serverIP, cfg.Port),
+				"password": coalesce(cfg.Password, cfg.UUID),
+			},
+		}
+
+	default:
+		return map[string]interface{}{
+			"tag":      p.Label,
+			"protocol": "vless",
+			"settings": map[string]interface{}{
+				"vnext": []map[string]interface{}{
+					{
+						"address": serverIP,
+						"port":    cfg.Port,
+						"users": []map[string]interface{}{
+							{
+								"id":         cfg.UUID,
+								"encryption": "none",
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// HTML browser subscription page
+// ---------------------------------------------------------------------------
+
+// subHTMLTemplate is the template for the browser subscription page.
+var subHTMLTemplate = template.Must(template.New("sub").Parse(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HydraFlow — Your Proxy Configuration</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+         background: #0f172a; color: #e2e8f0; padding: 2rem; line-height: 1.6; }
+  .container { max-width: 800px; margin: 0 auto; }
+  h1 { color: #38bdf8; margin-bottom: 0.5rem; font-size: 2rem; }
+  .subtitle { color: #64748b; margin-bottom: 2rem; }
+  .card { background: #1e293b; border-radius: 12px; padding: 1.5rem;
+          margin-bottom: 1.5rem; border: 1px solid #334155; }
+  .card h2 { color: #38bdf8; font-size: 1.2rem; margin-bottom: 1rem; }
+  .protocol { display: flex; align-items: center; gap: 0.5rem;
+              margin-bottom: 0.5rem; padding: 0.75rem;
+              background: #0f172a; border-radius: 8px; }
+  .protocol .badge { background: #22c55e; color: #000; padding: 2px 8px;
+                     border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+  .protocol .badge.down { background: #ef4444; color: #fff; }
+  .protocol .badge.rec { background: #38bdf8; color: #000; }
+  .protocol .name { font-weight: 600; flex: 1; }
+  .protocol .latency { color: #64748b; font-size: 0.85rem; }
+  .link-box { background: #0f172a; border-radius: 8px; padding: 1rem;
+              margin-top: 0.75rem; word-break: break-all; font-family: monospace;
+              font-size: 0.85rem; color: #94a3b8; position: relative; }
+  .link-box .copy-btn { position: absolute; top: 0.5rem; right: 0.5rem;
+                        background: #334155; border: none; color: #e2e8f0;
+                        padding: 4px 12px; border-radius: 6px; cursor: pointer;
+                        font-size: 0.8rem; }
+  .link-box .copy-btn:hover { background: #475569; }
+  .qr-container { text-align: center; margin-top: 1rem; }
+  .qr-container img { background: #fff; padding: 8px; border-radius: 8px;
+                      max-width: 200px; }
+  .instructions { margin-top: 2rem; }
+  .instructions li { margin-bottom: 0.5rem; padding-left: 0.5rem; }
+  .instructions code { background: #334155; padding: 2px 6px; border-radius: 4px;
+                       font-size: 0.9rem; }
+  .sub-url { background: #164e63; border: 1px solid #38bdf8; border-radius: 8px;
+             padding: 1rem; margin-bottom: 1rem; font-family: monospace;
+             word-break: break-all; }
+  .footer { margin-top: 2rem; text-align: center; color: #475569; font-size: 0.85rem; }
+  .format-links { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+  .format-links a { background: #334155; color: #38bdf8; padding: 6px 14px;
+                    border-radius: 6px; text-decoration: none; font-size: 0.85rem; }
+  .format-links a:hover { background: #475569; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>HydraFlow</h1>
+  <p class="subtitle">Smart Anti-Censorship Proxy &mdash; ISP: {{.ISP}}</p>
+
+  <div class="card">
+    <h2>Subscription URL</h2>
+    <div class="sub-url" id="sub-url">{{.SubURL}}</div>
+    <button class="copy-btn" onclick="copyText('sub-url')">Copy</button>
+    <div class="format-links">
+      <a href="{{.SubURL}}?format=v2ray">V2Ray Base64</a>
+      <a href="{{.SubURL}}?format=clash">Clash Meta</a>
+      <a href="{{.SubURL}}?format=singbox">sing-box</a>
+      <a href="{{.SubURL}}?format=xray-json">Xray JSON</a>
+      <a href="{{.SubURL}}?format=json">Raw JSON</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Available Protocols ({{len .Protocols}} configured)</h2>
+    {{range .Protocols}}
+    <div class="protocol">
+      <span class="badge{{if not .HealthUp}} down{{end}}{{if eq .Rank 0}} rec{{end}}">
+        {{if eq .Rank 0}}BEST{{else if .HealthUp}}UP{{else}}DOWN{{end}}
+      </span>
+      <span class="name">{{.Label}}</span>
+      <span class="latency">{{if gt .LatencyMs 0}}{{.LatencyMs}}ms{{end}}</span>
+    </div>
+    {{end}}
+  </div>
+
+  {{range .Protocols}}
+  <div class="card">
+    <h2>{{.Label}}</h2>
+    <div class="link-box" id="link-{{.Name}}">{{.Link}}</div>
+    <button class="copy-btn" onclick="copyText('link-{{.Name}}')">Copy</button>
+    <div class="qr-container">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={{.LinkEncoded}}" alt="QR Code" loading="lazy">
+    </div>
+  </div>
+  {{end}}
+
+  <div class="card instructions">
+    <h2>Setup Instructions</h2>
+    <ol>
+      <li><strong>Android:</strong> Install <code>v2rayNG</code> or <code>Hiddify</code> from Play Store. Paste the subscription URL.</li>
+      <li><strong>iOS:</strong> Install <code>Shadowrocket</code> or <code>Streisand</code> from App Store. Add subscription URL.</li>
+      <li><strong>Windows:</strong> Download <code>v2rayN</code> or <code>Hiddify</code>. Add subscription &rarr; paste URL.</li>
+      <li><strong>macOS:</strong> Download <code>V2Box</code> or <code>Hiddify</code>. Import subscription.</li>
+      <li><strong>Linux:</strong> Use <code>v2rayA</code> or <code>Hiddify</code> CLI. Import subscription URL.</li>
+    </ol>
+  </div>
+
+  <p class="footer">Generated by HydraFlow at {{.Time}} &mdash; Auto-updates every 6 hours</p>
+</div>
+<script>
+function copyText(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    navigator.clipboard.writeText(el.textContent.trim()).then(() => {
+      const btn = el.parentElement.querySelector('.copy-btn');
+      if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 2000); }
+    });
+  }
+}
+</script>
+</body>
+</html>`))
+
+type htmlProtoData struct {
+	Name        string
+	Label       string
+	Link        string
+	LinkEncoded string
+	HealthUp    bool
+	LatencyMs   int64
+	Rank        int
+}
+
+type htmlPageData struct {
+	ISP       string
+	SubURL    string
+	Protocols []htmlProtoData
+	Time      string
+}
+
+func (s *server) serveHTML(w http.ResponseWriter, r *http.Request, protocols []orderedProtocol, ispName string) {
+	subURL := fmt.Sprintf("http://%s:%d%s", s.cfg.ServerIP, s.cfg.SubPort, r.URL.Path)
+
+	var protoData []htmlProtoData
+	for _, p := range protocols {
+		link := s.buildV2RayLinkForISP(p, ispName)
+		protoData = append(protoData, htmlProtoData{
+			Name:        p.Name,
+			Label:       p.Label,
+			Link:        link,
+			LinkEncoded: url.QueryEscape(link),
+			HealthUp:    p.HealthUp,
+			LatencyMs:   p.LatencyMs,
+			Rank:        p.Rank,
+		})
+	}
+
+	data := htmlPageData{
+		ISP:       ispName,
+		SubURL:    subURL,
+		Protocols: protoData,
+		Time:      time.Now().UTC().Format(time.RFC3339),
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := subHTMLTemplate.Execute(w, data); err != nil {
+		log.Printf("[html] template error: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Client telemetry endpoint
 // ---------------------------------------------------------------------------
 
@@ -1719,16 +2285,29 @@ func (s *server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract token: /admin/{token}/status
+	// Extract token and action: /admin/{token}/status or /admin/{token}/stats
 	path := strings.TrimPrefix(r.URL.Path, "/admin/")
 	parts := strings.SplitN(path, "/", 2)
-	if len(parts) < 2 || parts[1] != "status" {
+	if len(parts) < 2 {
 		http.NotFound(w, r)
 		return
 	}
 
 	token := parts[0]
+	action := parts[1]
+
 	if subtle.ConstantTimeCompare([]byte(token), []byte(s.cfg.SubToken)) != 1 {
+		http.NotFound(w, r)
+		return
+	}
+
+	switch action {
+	case "stats":
+		s.handleAdminStats(w)
+		return
+	case "status":
+		// Fall through to existing status handler below.
+	default:
 		http.NotFound(w, r)
 		return
 	}
@@ -1801,6 +2380,25 @@ func (s *server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	data, err := json.MarshalIndent(status, "", "  ")
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.Write(data)
+}
+
+// handleAdminStats serves subscription fetch statistics.
+// GET /admin/{token}/stats
+func (s *server) handleAdminStats(w http.ResponseWriter) {
+	if s.subFetches == nil {
+		json.NewEncoder(w).Encode(map[string]string{"error": "tracking not initialized"})
+		return
+	}
+
+	stats := s.subFetches.getStats()
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	data, err := json.MarshalIndent(stats, "", "  ")
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
