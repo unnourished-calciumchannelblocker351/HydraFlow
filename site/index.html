@@ -11,12 +11,12 @@
 <meta property="og:url" content="https://hydraflow.xyz">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://hydraflow.xyz">
-<link rel="icon" type="image/svg+xml" href="assets/hydraflow-logo.svg">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none' stroke='%2300e8c6' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M16 28V14l-6 6 6-12 6 12-6-6'/%3E%3Cpath d='M8 26V18l-3 3 3-9' opacity='.5'/%3E%3Cpath d='M24 26V18l3 3-3-9' opacity='.5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#060a12;--bg2:#0b1121;--bg3:#111b30;--text:#c8d4e6;--text-dim:#556880;--text-bright:#eaf0f8;--cyan:#00e8c6;--cyan2:#00b4d8;--indigo:#5b6cf0;--violet:#8b5cf6;--border:rgba(100,140,200,.1);--glass:rgba(11,17,33,.65);--r:12px;--font:'Outfit',sans-serif;--mono:'JetBrains Mono',monospace}
+:root{--bg:#060a12;--bg2:#0b1121;--bg3:#111b30;--text:#c8d4e6;--text-dim:#556880;--text-bright:#eaf0f8;--cyan:#00e8c6;--cyan2:#00b4d8;--indigo:#5b6cf0;--violet:#8b5cf6;--border:rgba(100,140,200,.1);--glass:rgba(11,17,33,.3);--r:12px;--font:'Outfit',sans-serif;--mono:'JetBrains Mono',monospace}
 html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.65;overflow-x:hidden;-webkit-font-smoothing:antialiased}
 ::selection{background:rgba(0,232,198,.2);color:var(--text-bright)}a{color:var(--cyan);text-decoration:none;transition:.2s}a:hover{color:var(--text-bright)}
 .aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}.aurora i{position:absolute;border-radius:50%;filter:blur(100px);opacity:.15;animation:drift 20s ease-in-out infinite alternate}.aurora i:nth-child(1){width:700px;height:700px;background:var(--cyan);top:-300px;left:-200px;animation-duration:25s}.aurora i:nth-child(2){width:500px;height:500px;background:var(--indigo);bottom:-200px;right:-100px;animation-duration:30s;animation-delay:-5s}.aurora i:nth-child(3){width:400px;height:400px;background:var(--violet);top:40%;left:50%;animation-duration:22s;animation-delay:-10s}
@@ -84,7 +84,7 @@ footer{border-top:1px solid var(--border);padding:2.5rem 0}.fi2{display:flex;jus
 <div class="step reveal d3"><div class="step-num">04</div><h3 data-i18n="st4">Adapt</h3><p data-i18n="sd4">Protocol blocked? Auto-switch. Health checks every 5 minutes.</p></div>
 </div></div></section>
 
-<section id="feat" style="background:rgba(11,17,33,.5)"><div class="container">
+<section id="feat" style=""><div class="container">
 <div class="stag reveal" data-i18n="ft">Features</div><h2 class="sh reveal d1" data-i18n="ftt">Everything to bypass censorship</h2>
 <div class="features">
 <div class="feat reveal"><div class="fi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m-7.07-3.93 2.83-2.83m8.48-8.48 2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83"/></svg></div><h3 data-i18n="f1t">Smart Subscription</h3><p data-i18n="f1d">Detects client ISP and returns the best protocol configuration with bypass settings.</p></div>
@@ -108,7 +108,7 @@ footer{border-top:1px solid var(--border);padding:2.5rem 0}.fi2{display:flex;jus
 <tr><td>DNS-over-HTTPS</td><td data-i18n="b8">Encrypted DNS</td><td data-i18n="b8a">DNS censorship</td><td><span class="badge bg" data-i18n="active">Active</span></td></tr>
 </tbody></table></div></div></section>
 
-<section id="cmp" style="background:rgba(11,17,33,.5)"><div class="container">
+<section id="cmp" style=""><div class="container">
 <div class="stag reveal" data-i18n="ct">Comparison</div><h2 class="sh reveal d1" data-i18n="ctt">How HydraFlow compares</h2>
 <div class="tw reveal d2"><table><thead><tr><th data-i18n="ch1">Feature</th><th class="hl" style="color:var(--cyan)">HydraFlow</th><th>3x-ui</th><th>Marzban</th><th>Amnezia</th><th>Outline</th></tr></thead><tbody>
 <tr><td data-i18n="c1">One-command install</td><td class="hl"><span class="ck">&#10003;</span></td><td><span class="ck">&#10003;</span></td><td><span class="cx">&#10005;</span></td><td><span class="ck">&#10003;</span></td><td><span class="ck">&#10003;</span></td></tr>
@@ -130,7 +130,7 @@ footer{border-top:1px solid var(--border);padding:2.5rem 0}.fi2{display:flex;jus
 <div class="dev reveal d3"><div class="di"><svg viewBox="0 0 24 24"><path d="M20 16V7a2 2 0 00-2-2H6a2 2 0 00-2 2v9m16 0H4m16 0l1.28 2.55a1 1 0 01-.9 1.45H3.62a1 1 0 01-.9-1.45L4 16"/></svg></div><h3>macOS / Linux</h3><ol><li data-i18n="dm1">Download <strong>Hiddify</strong> or <strong>Clash Verge</strong></li><li data-i18n="dm2">Add subscription URL</li><li data-i18n="dm3">Connect</li></ol></div>
 </div></div></section>
 
-<section style="background:rgba(11,17,33,.5)"><div class="container">
+<section style=""><div class="container">
 <div class="stag reveal" data-i18n="scrt">In action</div><h2 class="sh reveal d1" data-i18n="scrtt">What you see after install</h2>
 <div class="screens">
 <div class="scr reveal"><div class="scr-h"><i></i><i></i><i></i><span>install output</span></div><pre><span class="d">$</span> <span class="w">bash install.sh</span>
