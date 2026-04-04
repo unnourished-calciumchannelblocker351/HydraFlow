@@ -1,395 +1,186 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>HydraFlow — Bypass Internet Censorship</title>
-<meta name="description" content="Smart anti-censorship proxy. One command to install, auto-detects your ISP, selects the best bypass method. Works in Russia, China, Iran, Turkey.">
+<meta name="description" content="Smart anti-censorship proxy with ISP detection and auto bypass. One command install. Works in Russia, China, Iran, Turkey.">
 <meta property="og:title" content="HydraFlow — Bypass Internet Censorship">
-<meta property="og:description" content="One command. All bypass methods. Smart ISP detection.">
+<meta property="og:description" content="Cut one head, two more grow back. Smart proxy with auto ISP detection.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://hydraflow.xyz">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://hydraflow.xyz">
+<link rel="icon" type="image/svg+xml" href="assets/hydraflow-logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{
-  --bg:#060a12;--bg2:#0c1220;--bg3:#121a2e;
-  --text:#d0d7e3;--text-dim:#6b7a94;--text-bright:#f0f4f8;
-  --accent:#00d4aa;--accent2:#0891b2;--accent3:#6366f1;
-  --border:#1a2540;
-  --font-display:'Outfit',sans-serif;
-  --font-mono:'JetBrains Mono',monospace;
-}
-html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--text);font-family:var(--font-display);line-height:1.6;overflow-x:hidden}
-a{color:var(--accent);text-decoration:none;transition:color .2s}
-a:hover{color:var(--text-bright)}
-
-/* Grain overlay */
-body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;
-  background:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.03'/%3E%3C/svg%3E");
-  pointer-events:none;z-index:9999}
-
-/* Glow effect */
-.glow{position:absolute;width:600px;height:600px;border-radius:50%;filter:blur(120px);opacity:.12;pointer-events:none}
-.glow-1{background:var(--accent);top:-200px;left:-100px}
-.glow-2{background:var(--accent3);top:200px;right:-200px}
-
-/* Nav */
-nav{position:fixed;top:0;width:100%;z-index:100;backdrop-filter:blur(20px);background:rgba(6,10,18,.8);border-bottom:1px solid var(--border);padding:0 2rem}
-nav .inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:64px}
-nav .logo{display:flex;align-items:center;gap:.75rem;font-weight:700;font-size:1.2rem;color:var(--text-bright)}
-nav .logo img{height:32px;width:32px}
-nav .links{display:flex;gap:2rem;font-size:.9rem;font-weight:500}
-nav .links a{color:var(--text-dim)}
-nav .links a:hover{color:var(--accent)}
-.btn{display:inline-flex;align-items:center;gap:.5rem;padding:.6rem 1.4rem;border-radius:8px;font-weight:600;font-size:.9rem;transition:all .25s;border:none;cursor:pointer;font-family:var(--font-display)}
-.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#060a12}
-.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,212,170,.25);color:#060a12}
-.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
-.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
-
-/* Hero */
-.hero{position:relative;min-height:100vh;display:flex;align-items:center;padding:8rem 2rem 4rem;overflow:hidden}
-.hero .inner{max-width:1200px;margin:0 auto;position:relative;z-index:1}
-.hero-badge{display:inline-flex;align-items:center;gap:.5rem;padding:.4rem 1rem;border-radius:999px;border:1px solid var(--border);font-size:.8rem;color:var(--accent);margin-bottom:2rem;background:rgba(0,212,170,.05)}
-.hero h1{font-size:clamp(2.5rem,6vw,4.5rem);font-weight:800;line-height:1.1;color:var(--text-bright);max-width:800px;margin-bottom:1.5rem}
-.hero h1 .gradient{background:linear-gradient(135deg,var(--accent),var(--accent2),var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.hero p{font-size:1.2rem;color:var(--text-dim);max-width:560px;margin-bottom:2.5rem;font-weight:300}
-.hero-actions{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:3rem}
-
-/* Install box */
-.install-box{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:1.25rem 1.75rem;max-width:700px;position:relative;margin-bottom:1rem}
-.install-box::before{content:'$';position:absolute;left:1.75rem;color:var(--accent);font-family:var(--font-mono);font-weight:700}
-.install-box code{font-family:var(--font-mono);font-size:.9rem;color:var(--text-bright);padding-left:1.25rem;display:block;word-break:break-all}
-.install-box .copy-btn{position:absolute;right:1rem;top:50%;transform:translateY(-50%);background:var(--bg3);border:1px solid var(--border);color:var(--text-dim);padding:.35rem .75rem;border-radius:6px;font-size:.75rem;cursor:pointer;font-family:var(--font-mono)}
-.install-box .copy-btn:hover{color:var(--accent);border-color:var(--accent)}
-.install-note{font-size:.8rem;color:var(--text-dim);font-weight:300}
-
-/* Stats bar */
-.stats{display:flex;gap:3rem;padding:3rem 0;flex-wrap:wrap}
-.stat{display:flex;flex-direction:column}
-.stat-value{font-size:2rem;font-weight:700;color:var(--text-bright);font-family:var(--font-mono)}
-.stat-label{font-size:.8rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.1em}
-
-/* Section base */
-section{padding:6rem 2rem}
-section .inner{max-width:1200px;margin:0 auto}
-.section-label{font-size:.75rem;text-transform:uppercase;letter-spacing:.15em;color:var(--accent);font-weight:600;margin-bottom:.75rem}
-.section-title{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:700;color:var(--text-bright);margin-bottom:1rem}
-.section-desc{font-size:1.05rem;color:var(--text-dim);max-width:560px;font-weight:300;margin-bottom:3rem}
-
-/* How it works */
-.flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.5rem}
-.flow-step{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:2rem;position:relative;transition:border-color .3s}
-.flow-step:hover{border-color:var(--accent)}
-.flow-step .num{font-family:var(--font-mono);font-size:3rem;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1;margin-bottom:1rem}
-.flow-step h3{font-size:1.1rem;font-weight:600;color:var(--text-bright);margin-bottom:.5rem}
-.flow-step p{font-size:.9rem;color:var(--text-dim);font-weight:300}
-
-/* Features */
-.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.5rem}
-.feature{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:2rem;transition:all .3s}
-.feature:hover{border-color:var(--accent);transform:translateY(-4px)}
-.feature-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin-bottom:1.25rem;background:linear-gradient(135deg,rgba(0,212,170,.1),rgba(99,102,241,.1));border:1px solid rgba(0,212,170,.2)}
-.feature h3{font-size:1.15rem;font-weight:600;color:var(--text-bright);margin-bottom:.5rem}
-.feature p{font-size:.9rem;color:var(--text-dim);font-weight:300;line-height:1.7}
-
-/* Bypass methods */
-.methods{overflow-x:auto}
-.methods table{width:100%;border-collapse:collapse;font-size:.9rem}
-.methods th{text-align:left;padding:1rem;color:var(--accent);font-weight:600;border-bottom:2px solid var(--border);white-space:nowrap}
-.methods td{padding:1rem;border-bottom:1px solid var(--border);color:var(--text-dim)}
-.methods tr:hover td{background:var(--bg2);color:var(--text)}
-.badge{display:inline-block;padding:.15rem .6rem;border-radius:999px;font-size:.75rem;font-weight:600}
-.badge-green{background:rgba(0,212,170,.15);color:#00d4aa}
-.badge-yellow{background:rgba(234,179,8,.15);color:#eab308}
-.badge-red{background:rgba(239,68,68,.15);color:#ef4444}
-
-/* Comparison */
-.comparison table{width:100%;border-collapse:collapse;font-size:.85rem}
-.comparison th{padding:.85rem 1rem;text-align:left;font-weight:600;color:var(--text-bright);border-bottom:2px solid var(--border);position:sticky;top:64px;background:var(--bg)}
-.comparison td{padding:.85rem 1rem;border-bottom:1px solid var(--border)}
-.comparison tr:hover td{background:var(--bg2)}
-.check{color:var(--accent)}
-.cross{color:var(--text-dim);opacity:.4}
-.highlight-col{background:rgba(0,212,170,.03)}
-
-/* Devices */
-.devices{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.5rem}
-.device{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:2rem;transition:border-color .3s}
-.device:hover{border-color:var(--accent)}
-.device-icon{font-size:2rem;margin-bottom:1rem}
-.device h3{font-size:1.1rem;font-weight:600;color:var(--text-bright);margin-bottom:.75rem}
-.device ol{padding-left:1.25rem;font-size:.9rem;color:var(--text-dim)}
-.device ol li{margin-bottom:.4rem}
-.device ol li strong{color:var(--text)}
-
-/* CTA */
-.cta{text-align:center;padding:6rem 2rem;position:relative}
-.cta h2{font-size:clamp(2rem,5vw,3rem);font-weight:800;color:var(--text-bright);margin-bottom:1rem}
-.cta p{font-size:1.1rem;color:var(--text-dim);margin-bottom:2rem;font-weight:300}
-.cta-quote{font-style:italic;color:var(--text-dim);font-size:1rem;margin-top:3rem;opacity:.6}
-
-/* Footer */
-footer{border-top:1px solid var(--border);padding:3rem 2rem;text-align:center}
-footer .inner{max-width:1200px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem}
-footer .links{display:flex;gap:1.5rem;font-size:.85rem}
-footer .copy{font-size:.8rem;color:var(--text-dim)}
-
-/* Responsive */
-@media(max-width:768px){
-  nav .links{display:none}
-  .stats{gap:1.5rem}
-  .hero{padding:6rem 1.5rem 3rem}
-  section{padding:4rem 1.5rem}
-  .comparison{overflow-x:auto}
-  .comparison table{min-width:700px}
-}
-
-/* Animations */
-@keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
-.animate{animation:fadeUp .6s ease-out both}
-.delay-1{animation-delay:.1s}
-.delay-2{animation-delay:.2s}
-.delay-3{animation-delay:.3s}
-.delay-4{animation-delay:.4s}
+:root{--bg:#060a12;--bg2:#0b1121;--bg3:#111b30;--text:#c8d4e6;--text-dim:#556880;--text-bright:#eaf0f8;--cyan:#00e8c6;--cyan2:#00b4d8;--indigo:#5b6cf0;--violet:#8b5cf6;--border:rgba(100,140,200,.1);--glass:rgba(11,17,33,.65);--r:12px;--font:'Outfit',sans-serif;--mono:'JetBrains Mono',monospace}
+html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.65;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+::selection{background:rgba(0,232,198,.2);color:var(--text-bright)}a{color:var(--cyan);text-decoration:none;transition:.2s}a:hover{color:var(--text-bright)}
+.aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}.aurora i{position:absolute;border-radius:50%;filter:blur(100px);opacity:.15;animation:drift 20s ease-in-out infinite alternate}.aurora i:nth-child(1){width:700px;height:700px;background:var(--cyan);top:-300px;left:-200px;animation-duration:25s}.aurora i:nth-child(2){width:500px;height:500px;background:var(--indigo);bottom:-200px;right:-100px;animation-duration:30s;animation-delay:-5s}.aurora i:nth-child(3){width:400px;height:400px;background:var(--violet);top:40%;left:50%;animation-duration:22s;animation-delay:-10s}
+@keyframes drift{0%{transform:translate(0,0) scale(1)}50%{transform:translate(60px,-40px) scale(1.1)}100%{transform:translate(-40px,60px) scale(.9)}}
+body::after{content:'';position:fixed;inset:0;z-index:9998;pointer-events:none;background:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.025'/%3E%3C/svg%3E")}
+.wrap{position:relative;z-index:1}.container{max-width:1140px;margin:0 auto;padding:0 1.5rem}section{padding:7rem 0}
+nav{position:fixed;top:0;width:100%;z-index:100;backdrop-filter:blur(24px);background:rgba(6,10,18,.75);border-bottom:1px solid var(--border)}.nav-inner{max-width:1140px;margin:0 auto;padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:60px}
+.nav-logo{display:flex;align-items:center;gap:.6rem;font-weight:700;font-size:1.1rem;color:var(--text-bright)}.nav-logo svg{width:28px;height:28px}
+.nav-links{display:flex;align-items:center;gap:1.8rem}.nav-links a{color:var(--text-dim);font-size:.85rem;font-weight:500}.nav-links a:hover{color:var(--cyan)}
+.lang-sw{display:flex;gap:2px;background:var(--bg3);border-radius:6px;padding:2px;margin-left:.5rem}.lang-sw button{background:none;border:none;color:var(--text-dim);font-family:var(--font);font-size:.75rem;font-weight:600;padding:.3rem .55rem;border-radius:4px;cursor:pointer;transition:.2s}.lang-sw button.active{background:var(--cyan);color:var(--bg)}.lang-sw button:hover:not(.active){color:var(--text)}
+.nav-gh{display:flex;align-items:center;gap:.4rem;padding:.4rem .9rem;border:1px solid var(--border);border-radius:8px;font-size:.8rem;font-weight:500;color:var(--text-dim);transition:.25s}.nav-gh:hover{border-color:var(--cyan);color:var(--cyan)}.nav-gh svg{width:16px;height:16px;fill:currentColor}
+@media(max-width:768px){.nav-links{display:none}}
+.hero{min-height:100vh;display:flex;align-items:center;padding-top:60px}.hero-content{position:relative;z-index:2}
+.hero-badge{display:inline-flex;align-items:center;gap:.5rem;padding:.35rem 1rem;border-radius:99px;border:1px solid rgba(0,232,198,.2);background:rgba(0,232,198,.05);font-size:.78rem;font-weight:500;color:var(--cyan);margin-bottom:2rem}.hero-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:pulse 2s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.hero h1{font-size:clamp(2.8rem,6.5vw,5rem);font-weight:900;line-height:1.05;letter-spacing:-.03em;color:var(--text-bright);margin-bottom:1.5rem}.grad{background:linear-gradient(135deg,var(--cyan),var(--cyan2),var(--indigo));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero p{font-size:1.15rem;color:var(--text-dim);max-width:520px;margin-bottom:2.5rem;font-weight:300}
+.hero-btns{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:3rem}
+.btn{display:inline-flex;align-items:center;gap:.5rem;padding:.65rem 1.5rem;border-radius:10px;font-weight:600;font-size:.9rem;font-family:var(--font);border:none;cursor:pointer;transition:.3s}.btn-fill{background:linear-gradient(135deg,var(--cyan),var(--cyan2));color:var(--bg);box-shadow:0 0 20px rgba(0,232,198,.15)}.btn-fill:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,232,198,.3);color:var(--bg)}.btn-line{background:transparent;border:1px solid var(--border);color:var(--text)}.btn-line:hover{border-color:var(--cyan);color:var(--cyan)}
+.term{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);max-width:680px;overflow:hidden}.term-bar{display:flex;align-items:center;gap:6px;padding:.6rem 1rem;border-bottom:1px solid var(--border)}.term-bar i{width:10px;height:10px;border-radius:50%}.term-bar i:nth-child(1){background:#ff5f57}.term-bar i:nth-child(2){background:#ffbd2e}.term-bar i:nth-child(3){background:#28c840}.term-bar span{margin-left:auto;font-size:.7rem;color:var(--text-dim);font-family:var(--mono)}.term-body{padding:1rem 1.25rem;position:relative}.term-body code{font-family:var(--mono);font-size:.85rem;color:var(--cyan);display:block}.term-body code .pr{color:var(--indigo)}.term-copy{position:absolute;right:.75rem;top:50%;transform:translateY(-50%);background:var(--bg3);border:1px solid var(--border);color:var(--text-dim);padding:.3rem .65rem;border-radius:6px;font-size:.7rem;font-family:var(--mono);cursor:pointer;transition:.2s}.term-copy:hover{border-color:var(--cyan);color:var(--cyan)}
+.term-note{font-size:.78rem;color:var(--text-dim);margin-top:.75rem;font-weight:300}
+.stats{display:flex;gap:3rem;margin-top:3rem;flex-wrap:wrap}.stat-n{font-size:2.2rem;font-weight:800;font-family:var(--mono);color:var(--text-bright)}.stat-l{font-size:.72rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-dim);margin-top:.15rem}
+.stag{font-size:.72rem;text-transform:uppercase;letter-spacing:.18em;color:var(--cyan);font-weight:600;margin-bottom:.6rem}.sh{font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:800;color:var(--text-bright);letter-spacing:-.02em;margin-bottom:.75rem}.sd{font-size:1rem;color:var(--text-dim);max-width:520px;font-weight:300;margin-bottom:3rem}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:1.25rem;position:relative}.steps::before{content:'';position:absolute;top:2.8rem;left:12.5%;right:12.5%;height:2px;background:linear-gradient(90deg,var(--cyan),var(--indigo),var(--violet));opacity:.25}.step{text-align:center}.step-num{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;font-family:var(--mono);font-weight:700;font-size:1.1rem;color:var(--cyan);background:var(--bg2);border:1px solid rgba(0,232,198,.2);position:relative;z-index:2}.step h3{font-size:1rem;font-weight:600;color:var(--text-bright);margin-bottom:.4rem}.step p{font-size:.85rem;color:var(--text-dim);font-weight:300;padding:0 .5rem}
+@media(max-width:768px){.steps{grid-template-columns:1fr 1fr;gap:2rem}.steps::before{display:none}}@media(max-width:480px){.steps{grid-template-columns:1fr}}
+.features{display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem}@media(max-width:768px){.features{grid-template-columns:1fr}}
+.feat{background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:16px;padding:2rem;transition:.35s}.feat:hover{border-color:rgba(0,232,198,.3);transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,232,198,.06)}
+.fi{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:1.2rem;background:linear-gradient(135deg,rgba(0,232,198,.1),rgba(91,108,240,.08));border:1px solid rgba(0,232,198,.15)}.fi svg{width:22px;height:22px;stroke:var(--cyan);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.feat h3{font-size:1.05rem;font-weight:600;color:var(--text-bright);margin-bottom:.45rem}.feat p{font-size:.87rem;color:var(--text-dim);font-weight:300;line-height:1.7}
+.tw{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r);background:var(--bg2)}table{width:100%;border-collapse:collapse;font-size:.85rem}th{text-align:left;padding:.85rem 1rem;font-weight:600;color:var(--cyan);border-bottom:1px solid var(--border);white-space:nowrap;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em}td{padding:.85rem 1rem;border-bottom:1px solid var(--border);transition:.15s}tr:last-child td{border-bottom:none}tr:hover td{background:rgba(0,232,198,.02)}td:first-child{color:var(--text-bright);font-weight:500}.badge{display:inline-block;padding:.15rem .55rem;border-radius:99px;font-size:.7rem;font-weight:600}.bg{background:rgba(0,232,198,.12);color:var(--cyan)}.hl{background:rgba(0,232,198,.03)}.ck{color:var(--cyan)}.cx{color:var(--text-dim);opacity:.35}
+.devices{display:grid;grid-template-columns:repeat(4,1fr);gap:1.25rem}@media(max-width:768px){.devices{grid-template-columns:1fr 1fr}}@media(max-width:480px){.devices{grid-template-columns:1fr}}
+.dev{background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:16px;padding:1.75rem;transition:.3s}.dev:hover{border-color:rgba(0,232,198,.25)}.di{margin-bottom:1rem}.di svg{width:32px;height:32px;stroke:var(--cyan);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}.dev h3{font-size:1rem;font-weight:600;color:var(--text-bright);margin-bottom:.65rem}.dev ol{padding-left:1.1rem;font-size:.85rem;color:var(--text-dim)}.dev ol li{margin-bottom:.35rem}.dev ol li strong{color:var(--text);font-weight:500}
+.screens{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}@media(max-width:768px){.screens{grid-template-columns:1fr}}.scr{border-radius:var(--r);overflow:hidden;border:1px solid var(--border)}.scr-h{display:flex;align-items:center;gap:6px;padding:.55rem 1rem;background:var(--bg3);border-bottom:1px solid var(--border)}.scr-h i{width:8px;height:8px;border-radius:50%}.scr-h i:nth-child(1){background:#ff5f57}.scr-h i:nth-child(2){background:#ffbd2e}.scr-h i:nth-child(3){background:#28c840}.scr-h span{margin-left:.5rem;font-size:.7rem;color:var(--text-dim);font-family:var(--mono)}.scr pre{padding:1rem;background:var(--bg2);font-family:var(--mono);font-size:.73rem;color:var(--text);overflow-x:auto;line-height:1.8;margin:0}.scr pre .g{color:var(--cyan)}.scr pre .y{color:#eab308}.scr pre .d{color:var(--text-dim)}.scr pre .w{color:var(--text-bright)}
+.cta{text-align:center;padding:8rem 0}.cta h2{font-size:clamp(2rem,5vw,3.2rem);font-weight:900;color:var(--text-bright);letter-spacing:-.02em;margin-bottom:.75rem}.cta p{font-size:1.1rem;color:var(--text-dim);margin-bottom:2rem;font-weight:300}.cta-q{margin-top:3rem;font-style:italic;color:var(--text-dim);opacity:.5;font-size:.95rem}
+footer{border-top:1px solid var(--border);padding:2.5rem 0}.fi2{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem}.fc{font-size:.78rem;color:var(--text-dim)}.fl{display:flex;gap:1.5rem}.fl a{font-size:.8rem;color:var(--text-dim)}.fl a:hover{color:var(--cyan)}
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .65s,transform .65s}.reveal.v{opacity:1;transform:none}.d1{transition-delay:.1s}.d2{transition-delay:.2s}.d3{transition-delay:.3s}.d4{transition-delay:.35s}
 </style>
 </head>
 <body>
+<div class="aurora"><i></i><i></i><i></i></div>
+<div class="wrap">
+<nav><div class="nav-inner">
+<a href="/" class="nav-logo"><svg viewBox="0 0 32 32" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M16 28V14l-6 6 6-12 6 12-6-6"/><path d="M8 26V18l-3 3 3-9" opacity=".5"/><path d="M24 26V18l3 3-3-9" opacity=".5"/></svg>HydraFlow</a>
+<div class="nav-links">
+<a href="#how" data-i18n="nav1">How it works</a><a href="#feat" data-i18n="nav2">Features</a><a href="#bypass" data-i18n="nav3">Bypass</a><a href="#cmp" data-i18n="nav4">Compare</a><a href="#conn" data-i18n="nav5">Connect</a>
+<div class="lang-sw"><button onclick="L('en')" class="active">EN</button><button onclick="L('ru')">RU</button><button onclick="L('zh')">ZH</button></div>
+<a href="https://github.com/Evr1kys/HydraFlow" target="_blank" class="nav-gh"><svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>Star</a>
+</div></div></nav>
 
-<nav>
-  <div class="inner">
-    <a href="/" class="logo">
-      <img src="https://raw.githubusercontent.com/Evr1kys/HydraFlow/main/docs/assets/hydraflow-logo.svg" alt="HydraFlow">
-      HydraFlow
-    </a>
-    <div class="links">
-      <a href="#how">How it works</a>
-      <a href="#features">Features</a>
-      <a href="#bypass">Bypass methods</a>
-      <a href="#compare">Compare</a>
-      <a href="#connect">Connect</a>
-      <a href="https://github.com/Evr1kys/HydraFlow" target="_blank">GitHub</a>
-    </div>
-    <a href="https://github.com/Evr1kys/HydraFlow" class="btn btn-ghost" target="_blank">
-      <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-      Star
-    </a>
-  </div>
-</nav>
+<section class="hero"><div class="container hero-content">
+<div class="hero-badge reveal"><span class="dot"></span><span data-i18n="badge">Open Source Anti-Censorship</span></div>
+<h1 class="reveal d1" data-i18n-h="h1">Cut one head,<br><span class="grad">two more grow back.</span></h1>
+<p class="reveal d2" data-i18n="hdesc">Smart proxy that auto-detects your ISP, selects the best bypass method, and switches protocols when one gets blocked.</p>
+<div class="hero-btns reveal d2"><a href="https://github.com/Evr1kys/HydraFlow" class="btn btn-fill" data-i18n="hb1">Get Started</a><a href="#how" class="btn btn-line" data-i18n="hb2">How it works</a></div>
+<div class="term reveal d3"><div class="term-bar"><i></i><i></i><i></i><span>bash</span></div><div class="term-body"><code><span class="pr">$</span> bash &lt;(curl -fsSL https://raw.githubusercontent.com/Evr1kys/HydraFlow/main/install.sh)</code><button class="term-copy" onclick="navigator.clipboard.writeText('bash <(curl -fsSL https://raw.githubusercontent.com/Evr1kys/HydraFlow/main/install.sh)');this.textContent='OK';setTimeout(()=>this.textContent='Copy',1500)">Copy</button></div></div>
+<p class="term-note reveal d3" data-i18n="hnote">Ubuntu, Debian, CentOS. Installs in 30 seconds.</p>
+<div class="stats reveal d4"><div><div class="stat-n" data-c="20000">0</div><div class="stat-l" data-i18n="s1">Lines of Go</div></div><div><div class="stat-n" data-c="6">0</div><div class="stat-l" data-i18n="s2">Bypass methods</div></div><div><div class="stat-n" data-c="13">0</div><div class="stat-l" data-i18n="s3">ISP profiles</div></div><div><div class="stat-n" data-c="244">0</div><div class="stat-l" data-i18n="s4">Tests passing</div></div></div>
+</div></section>
 
-<!-- Hero -->
-<section class="hero">
-  <div class="glow glow-1"></div>
-  <div class="glow glow-2"></div>
-  <div class="inner">
-    <div class="hero-badge animate">Open Source Anti-Censorship</div>
-    <h1 class="animate delay-1">Cut one head,<br><span class="gradient">two more grow back.</span></h1>
-    <p class="animate delay-2">Smart proxy that auto-detects your ISP, selects the best bypass method, and switches protocols when one gets blocked.</p>
-    <div class="hero-actions animate delay-3">
-      <a href="https://github.com/Evr1kys/HydraFlow" class="btn btn-primary">Get Started</a>
-      <a href="#how" class="btn btn-ghost">How it works</a>
-    </div>
-    <div class="install-box animate delay-3">
-      <code>bash &lt;(curl -fsSL https://raw.githubusercontent.com/Evr1kys/HydraFlow/main/install.sh)</code>
-      <button class="copy-btn" onclick="navigator.clipboard.writeText('bash <(curl -fsSL https://raw.githubusercontent.com/Evr1kys/HydraFlow/main/install.sh)');this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000)">Copy</button>
-    </div>
-    <p class="install-note animate delay-4">Works on any VPS: Ubuntu, Debian, CentOS. Installs in 30 seconds.</p>
+<section id="how"><div class="container">
+<div class="stag reveal" data-i18n="ht">How it works</div><h2 class="sh reveal d1" data-i18n="htt">Intelligence at every step</h2><p class="sd reveal d2" data-i18n="htd">HydraFlow probes the network, detects what's blocked, and delivers the optimal configuration — automatically.</p>
+<div class="steps">
+<div class="step reveal"><div class="step-num">01</div><h3 data-i18n="st1">Install</h3><p data-i18n="sd1">One command on your VPS. Configures xray with 3 protocols.</p></div>
+<div class="step reveal d1"><div class="step-num">02</div><h3 data-i18n="st2">Detect</h3><p data-i18n="sd2">Identifies client ISP and checks which protocols are blocked.</p></div>
+<div class="step reveal d2"><div class="step-num">03</div><h3 data-i18n="st3">Optimize</h3><p data-i18n="sd3">Returns subscription ordered by effectiveness with bypass settings.</p></div>
+<div class="step reveal d3"><div class="step-num">04</div><h3 data-i18n="st4">Adapt</h3><p data-i18n="sd4">Protocol blocked? Auto-switch. Health checks every 5 minutes.</p></div>
+</div></div></section>
 
-    <div class="stats animate delay-4">
-      <div class="stat"><span class="stat-value">20K+</span><span class="stat-label">Lines of Go</span></div>
-      <div class="stat"><span class="stat-value">6</span><span class="stat-label">Bypass methods</span></div>
-      <div class="stat"><span class="stat-value">13</span><span class="stat-label">ISP profiles</span></div>
-      <div class="stat"><span class="stat-value">244</span><span class="stat-label">Tests passing</span></div>
-    </div>
-  </div>
-</section>
+<section id="feat" style="background:rgba(11,17,33,.5)"><div class="container">
+<div class="stag reveal" data-i18n="ft">Features</div><h2 class="sh reveal d1" data-i18n="ftt">Everything to bypass censorship</h2>
+<div class="features">
+<div class="feat reveal"><div class="fi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m-7.07-3.93 2.83-2.83m8.48-8.48 2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83"/></svg></div><h3 data-i18n="f1t">Smart Subscription</h3><p data-i18n="f1d">Detects client ISP and returns the best protocol configuration with bypass settings.</p></div>
+<div class="feat reveal d1"><div class="fi"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><h3 data-i18n="f2t">All Bypass Methods</h3><p data-i18n="f2d">TLS fragmentation, padding, TCP desync, SNI rotation, multi-hop chains, DoH.</p></div>
+<div class="feat reveal d2"><div class="fi"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div><h3 data-i18n="f3t">Multi-Protocol</h3><p data-i18n="f3d">VLESS+Reality, WebSocket+CDN, Shadowsocks-2022. Auto-failover on block.</p></div>
+<div class="feat reveal"><div class="fi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></div><h3 data-i18n="f4t">CDN Fallback</h3><p data-i18n="f4d">WebSocket through Cloudflare. DPI sees Cloudflare IP — can't block.</p></div>
+<div class="feat reveal d1"><div class="fi"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg></div><h3 data-i18n="f5t">Works with Everything</h3><p data-i18n="f5d">Standalone or with 3x-ui, Marzban. v2rayNG, Hiddify, Clash, sing-box.</p></div>
+<div class="feat reveal d2"><div class="fi"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><h3 data-i18n="f6t">Security Built In</h3><p data-i18n="f6d">Anti-probe, rate limiting, IP hashing, TLS 1.3, ad blocking.</p></div>
+</div></div></section>
 
-<!-- How it works -->
-<section id="how">
-  <div class="inner">
-    <div class="section-label">How it works</div>
-    <div class="section-title">Intelligence at every step</div>
-    <div class="section-desc">HydraFlow probes your network, detects what's blocked, and delivers the optimal configuration — automatically.</div>
-    <div class="flow">
-      <div class="flow-step animate"><div class="num">01</div><h3>Install</h3><p>One command on your VPS. Configures xray-core with 3 protocols, generates keys, opens firewall.</p></div>
-      <div class="flow-step animate delay-1"><div class="num">02</div><h3>Detect</h3><p>When a client connects, HydraFlow identifies their ISP via ASN lookup and checks which protocols are blocked.</p></div>
-      <div class="flow-step animate delay-2"><div class="num">03</div><h3>Optimize</h3><p>Returns a subscription with protocols ordered by what works best — with fragment and padding settings for DPI bypass.</p></div>
-      <div class="flow-step animate delay-3"><div class="num">04</div><h3>Adapt</h3><p>If a protocol gets blocked, clients auto-switch to the next one. Health checks run every 5 minutes.</p></div>
-    </div>
-  </div>
-</section>
+<section id="bypass"><div class="container">
+<div class="stag reveal" data-i18n="bt">Bypass methods</div><h2 class="sh reveal d1" data-i18n="btt">Every technique in one tool</h2>
+<div class="tw reveal d2"><table><thead><tr><th data-i18n="bh1">Method</th><th data-i18n="bh2">What it does</th><th data-i18n="bh3">Against</th><th data-i18n="bh4">Status</th></tr></thead><tbody>
+<tr><td>VLESS + Reality</td><td data-i18n="b1">TLS 1.3 mimicry — looks like real HTTPS</td><td data-i18n="b1a">Most DPI</td><td><span class="badge bg" data-i18n="active">Active</span></td></tr>
+<tr><td>WebSocket + CDN</td><td data-i18n="b2">Traffic through Cloudflare — IP hidden</td><td data-i18n="b2a">IP blocking</td><td><span class="badge bg" data-i18n="active">Active</span></td></tr>
+<tr><td data-i18n="b3n">TLS Fragmentation</td><td data-i18n="b3">Splits ClientHello to hide SNI</td><td data-i18n="b3a">SNI DPI</td><td><span class="badge bg" data-i18n="active">Active</span></td></tr>
+<tr><td data-i18n="b4n">Traffic Padding</td><td data-i18n="b4">Random data changes packet patterns</td><td data-i18n="b4a">Behavioral DPI</td><td><span class="badge bg" data-i18n="active">Active</span></td></tr>
+<tr><td data-i18n="b5n">SNI Rotation</td><td data-i18n="b5">Government domains as camouflage</td><td data-i18n="b5a">Domain blocking</td><td><span class="badge bg" data-i18n="active">Active</span></td></tr>
+<tr><td data-i18n="b6n">Multi-hop Chain</td><td data-i18n="b6">Client → RU → Foreign server</td><td data-i18n="b6a">IP blocking</td><td><span class="badge bg" data-i18n="active">Active</span></td></tr>
+<tr><td>Shadowsocks-2022</td><td data-i18n="b7">Encrypted stream, no TLS</td><td data-i18n="b7a">TLS DPI</td><td><span class="badge bg" data-i18n="active">Active</span></td></tr>
+<tr><td>DNS-over-HTTPS</td><td data-i18n="b8">Encrypted DNS</td><td data-i18n="b8a">DNS censorship</td><td><span class="badge bg" data-i18n="active">Active</span></td></tr>
+</tbody></table></div></div></section>
 
-<!-- Features -->
-<section id="features" style="background:var(--bg2)">
-  <div class="inner">
-    <div class="section-label">Features</div>
-    <div class="section-title">Everything you need to bypass censorship</div>
-    <div class="features">
-      <div class="feature animate">
-        <div class="feature-icon">&#x1f9e0;</div>
-        <h3>Smart Subscription</h3>
-        <p>Detects client ISP (MegaFon, MTS, China Telecom, etc.) and returns the best protocol configuration with bypass settings.</p>
-      </div>
-      <div class="feature animate delay-1">
-        <div class="feature-icon">&#x1f6e1;</div>
-        <h3>All Bypass Methods</h3>
-        <p>TLS fragmentation, traffic padding, TCP desync, SNI rotation, multi-hop chains, DNS-over-HTTPS — all built in.</p>
-      </div>
-      <div class="feature animate delay-2">
-        <div class="feature-icon">&#x26a1;</div>
-        <h3>Multi-Protocol</h3>
-        <p>VLESS+Reality, WebSocket+CDN, Shadowsocks-2022. Auto-failover when one gets blocked.</p>
-      </div>
-      <div class="feature animate delay-1">
-        <div class="feature-icon">&#x1f310;</div>
-        <h3>CDN Fallback</h3>
-        <p>WebSocket through Cloudflare. DPI sees traffic to Cloudflare IP — can't block without breaking the internet.</p>
-      </div>
-      <div class="feature animate delay-2">
-        <div class="feature-icon">&#x1f517;</div>
-        <h3>Works with Everything</h3>
-        <p>Standalone or alongside 3x-ui, Marzban, Remnawave. Standard clients: v2rayNG, Hiddify, Clash, sing-box.</p>
-      </div>
-      <div class="feature animate delay-3">
-        <div class="feature-icon">&#x1f512;</div>
-        <h3>Security Built In</h3>
-        <p>Anti-probe defense, rate limiting, IP hashing in logs, hardened TLS 1.3, ad blocking (YouTube, Google, TikTok).</p>
-      </div>
-    </div>
-  </div>
-</section>
+<section id="cmp" style="background:rgba(11,17,33,.5)"><div class="container">
+<div class="stag reveal" data-i18n="ct">Comparison</div><h2 class="sh reveal d1" data-i18n="ctt">How HydraFlow compares</h2>
+<div class="tw reveal d2"><table><thead><tr><th data-i18n="ch1">Feature</th><th class="hl" style="color:var(--cyan)">HydraFlow</th><th>3x-ui</th><th>Marzban</th><th>Amnezia</th><th>Outline</th></tr></thead><tbody>
+<tr><td data-i18n="c1">One-command install</td><td class="hl"><span class="ck">&#10003;</span></td><td><span class="ck">&#10003;</span></td><td><span class="cx">&#10005;</span></td><td><span class="ck">&#10003;</span></td><td><span class="ck">&#10003;</span></td></tr>
+<tr><td data-i18n="c2">ISP auto-detection</td><td class="hl"><span class="ck">&#10003;</span></td><td><span class="cx">&#10005;</span></td><td><span class="cx">&#10005;</span></td><td><span class="cx">&#10005;</span></td><td><span class="cx">&#10005;</span></td></tr>
+<tr><td data-i18n="c3">Smart protocol selection</td><td class="hl"><span class="ck">&#10003;</span></td><td><span class="cx">&#10005;</span></td><td><span class="cx">&#10005;</span></td><td><span class="cx">&#10005;</span></td><td><span class="cx">&#10005;</span></td></tr>
+<tr><td data-i18n="c4">Auto bypass settings</td><td class="hl"><span class="ck">&#10003;</span></td><td><span class="cx">&#10005;</span></td><td><span class="cx">&#10005;</span></td><td><span class="cx">&#10005;</span></td><td><span class="cx">&#10005;</span></td></tr>
+<tr><td data-i18n="c5">Multi-protocol failover</td><td class="hl"><span class="ck">&#10003;</span></td><td><span class="ck">&#10003;</span></td><td><span class="ck">&#10003;</span></td><td data-i18n="partial">Partial</td><td><span class="cx">&#10005;</span></td></tr>
+<tr><td data-i18n="c6">CDN fallback</td><td class="hl"><span class="ck">&#10003;</span></td><td><span class="ck">&#10003;</span></td><td><span class="ck">&#10003;</span></td><td><span class="cx">&#10005;</span></td><td><span class="cx">&#10005;</span></td></tr>
+<tr><td data-i18n="c7">Panel integration</td><td class="hl"><span class="ck">&#10003;</span></td><td>—</td><td>—</td><td><span class="cx">&#10005;</span></td><td><span class="cx">&#10005;</span></td></tr>
+<tr><td data-i18n="c8">Ad blocking</td><td class="hl"><span class="ck">&#10003;</span></td><td><span class="cx">&#10005;</span></td><td><span class="cx">&#10005;</span></td><td><span class="cx">&#10005;</span></td><td><span class="cx">&#10005;</span></td></tr>
+</tbody></table></div></div></section>
 
-<!-- Bypass Methods -->
-<section id="bypass">
-  <div class="inner">
-    <div class="section-label">Bypass methods</div>
-    <div class="section-title">Every technique in one tool</div>
-    <div class="section-desc">HydraFlow includes all known DPI circumvention methods. The smart subscription picks the right combination for each ISP.</div>
-    <div class="methods">
-      <table>
-        <thead><tr><th>Method</th><th>What it does</th><th>Effective against</th><th>Status</th></tr></thead>
-        <tbody>
-          <tr><td style="color:var(--text-bright);font-weight:600">VLESS + Reality</td><td>TLS 1.3 mimicry — looks like HTTPS to real website</td><td>Most DPI systems</td><td><span class="badge badge-green">Active</span></td></tr>
-          <tr><td style="color:var(--text-bright);font-weight:600">WebSocket + CDN</td><td>Traffic through Cloudflare — server IP hidden</td><td>IP blocking, TSPU</td><td><span class="badge badge-green">Active</span></td></tr>
-          <tr><td style="color:var(--text-bright);font-weight:600">TLS Fragmentation</td><td>Splits ClientHello to prevent SNI reading</td><td>SNI-based DPI</td><td><span class="badge badge-green">Active</span></td></tr>
-          <tr><td style="color:var(--text-bright);font-weight:600">Traffic Padding</td><td>Random data added to change packet size patterns</td><td>Behavioral analysis</td><td><span class="badge badge-green">Active</span></td></tr>
-          <tr><td style="color:var(--text-bright);font-weight:600">SNI Rotation</td><td>Uses government domains (gosuslugi.ru) as camouflage</td><td>Domain blocking</td><td><span class="badge badge-green">Active</span></td></tr>
-          <tr><td style="color:var(--text-bright);font-weight:600">Multi-hop Chain</td><td>Client → RU VPS → Foreign VPS</td><td>All foreign IP blocking</td><td><span class="badge badge-green">Active</span></td></tr>
-          <tr><td style="color:var(--text-bright);font-weight:600">Shadowsocks-2022</td><td>Encrypted stream without TLS handshake</td><td>TLS-focused DPI</td><td><span class="badge badge-green">Active</span></td></tr>
-          <tr><td style="color:var(--text-bright);font-weight:600">DNS-over-HTTPS</td><td>Encrypted DNS to prevent poisoning</td><td>DNS censorship</td><td><span class="badge badge-green">Active</span></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
+<section id="conn"><div class="container">
+<div class="stag reveal" data-i18n="dt">Connect</div><h2 class="sh reveal d1" data-i18n="dtt">Works on every device</h2>
+<div class="devices">
+<div class="dev reveal"><div class="di"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></div><h3>Android</h3><ol><li data-i18n="da1">Install <strong>v2rayNG</strong> or <strong>Hiddify</strong></li><li data-i18n="da2">Add subscription URL</li><li data-i18n="da3">Connect</li></ol></div>
+<div class="dev reveal d1"><div class="di"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></div><h3>iPhone</h3><ol><li data-i18n="di1">Install <strong>Hiddify</strong> or <strong>Streisand</strong></li><li data-i18n="di2">Add subscription URL</li><li data-i18n="di3">Connect</li></ol></div>
+<div class="dev reveal d2"><div class="di"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></div><h3>Windows</h3><ol><li data-i18n="dw1">Download <strong>Hiddify</strong> or <strong>v2rayN</strong></li><li data-i18n="dw2">Add subscription URL</li><li data-i18n="dw3">Connect</li></ol></div>
+<div class="dev reveal d3"><div class="di"><svg viewBox="0 0 24 24"><path d="M20 16V7a2 2 0 00-2-2H6a2 2 0 00-2 2v9m16 0H4m16 0l1.28 2.55a1 1 0 01-.9 1.45H3.62a1 1 0 01-.9-1.45L4 16"/></svg></div><h3>macOS / Linux</h3><ol><li data-i18n="dm1">Download <strong>Hiddify</strong> or <strong>Clash Verge</strong></li><li data-i18n="dm2">Add subscription URL</li><li data-i18n="dm3">Connect</li></ol></div>
+</div></div></section>
 
-<!-- Comparison -->
-<section id="compare" style="background:var(--bg2)">
-  <div class="inner">
-    <div class="section-label">Comparison</div>
-    <div class="section-title">How HydraFlow compares</div>
-    <div class="comparison">
-      <table>
-        <thead><tr><th>Feature</th><th class="highlight-col" style="color:var(--accent)">HydraFlow</th><th>3x-ui</th><th>Marzban</th><th>Amnezia</th><th>Outline</th></tr></thead>
-        <tbody>
-          <tr><td>One-command install</td><td class="highlight-col"><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td><td><span class="cross">&#10005;</span></td><td><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td></tr>
-          <tr><td>ISP auto-detection</td><td class="highlight-col"><span class="check">&#10003;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td></tr>
-          <tr><td>Smart protocol selection</td><td class="highlight-col"><span class="check">&#10003;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td></tr>
-          <tr><td>Auto bypass settings (fragment/padding)</td><td class="highlight-col"><span class="check">&#10003;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td></tr>
-          <tr><td>Multi-protocol + auto-failover</td><td class="highlight-col"><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td><td>Partial</td><td><span class="cross">&#10005;</span></td></tr>
-          <tr><td>CDN fallback (Cloudflare)</td><td class="highlight-col"><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td></tr>
-          <tr><td>Works with existing panels</td><td class="highlight-col"><span class="check">&#10003;</span></td><td>—</td><td>—</td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td></tr>
-          <tr><td>Ad blocking (YouTube, Google)</td><td class="highlight-col"><span class="check">&#10003;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td></tr>
-          <tr><td>Multi-server with health checks</td><td class="highlight-col"><span class="check">&#10003;</span></td><td><span class="cross">&#10005;</span></td><td><span class="check">&#10003;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td></tr>
-          <tr><td>DPI fingerprinting (TSPU/GFW/Sandvine)</td><td class="highlight-col"><span class="check">&#10003;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td><td><span class="cross">&#10005;</span></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
+<section style="background:rgba(11,17,33,.5)"><div class="container">
+<div class="stag reveal" data-i18n="scrt">In action</div><h2 class="sh reveal d1" data-i18n="scrtt">What you see after install</h2>
+<div class="screens">
+<div class="scr reveal"><div class="scr-h"><i></i><i></i><i></i><span>install output</span></div><pre><span class="d">$</span> <span class="w">bash install.sh</span>
 
-<!-- Connect devices -->
-<section id="connect">
-  <div class="inner">
-    <div class="section-label">Connect</div>
-    <div class="section-title">Works on every device</div>
-    <div class="section-desc">Use any standard proxy client. HydraFlow generates configs automatically.</div>
-    <div class="devices">
-      <div class="device animate">
-        <div class="device-icon">&#x1f4f1;</div>
-        <h3>Android</h3>
-        <ol>
-          <li>Install <strong>v2rayNG</strong> or <strong>Hiddify</strong></li>
-          <li>Add subscription URL</li>
-          <li>Connect</li>
-        </ol>
-      </div>
-      <div class="device animate delay-1">
-        <div class="device-icon">&#x1f34e;</div>
-        <h3>iPhone / iPad</h3>
-        <ol>
-          <li>Install <strong>Hiddify</strong> or <strong>Streisand</strong> from App Store</li>
-          <li>Add subscription URL</li>
-          <li>Connect</li>
-        </ol>
-      </div>
-      <div class="device animate delay-2">
-        <div class="device-icon">&#x1f5a5;</div>
-        <h3>Windows</h3>
-        <ol>
-          <li>Download <strong>Hiddify</strong> or <strong>v2rayN</strong></li>
-          <li>Add subscription URL</li>
-          <li>Connect</li>
-        </ol>
-      </div>
-      <div class="device animate delay-3">
-        <div class="device-icon">&#x1f4bb;</div>
-        <h3>macOS / Linux</h3>
-        <ol>
-          <li>Download <strong>Hiddify</strong> or <strong>Clash Verge Rev</strong></li>
-          <li>Add subscription URL</li>
-          <li>Connect</li>
-        </ol>
-      </div>
-    </div>
-  </div>
-</section>
+<span class="g">[+]</span> xray-core installed: v26.3
+<span class="g">[+]</span> UUID: a6ec9bc4-ab9c-4113...
+<span class="g">[+]</span> SNI domain: www.apple.com
+<span class="g">[+]</span> Protocols: 3 configured
 
-<!-- CTA -->
-<section class="cta">
-  <div class="glow glow-1" style="left:50%;transform:translateX(-50%);top:-100px"></div>
-  <h2>Internet should be <span class="gradient">free for everyone.</span></h2>
-  <p>HydraFlow is open source and always will be.</p>
-  <div>
-    <a href="https://github.com/Evr1kys/HydraFlow" class="btn btn-primary">View on GitHub</a>
-  </div>
-  <p class="cta-quote">"Cut one head, two more grow back."</p>
-</section>
+<span class="g">Subscription:</span>
+<span class="y">http://server:10086/sub/token</span>
 
-<footer>
-  <div class="inner">
-    <span class="copy">HydraFlow &copy; 2026. MPL-2.0 License.</span>
-    <div class="links">
-      <a href="https://github.com/Evr1kys/HydraFlow">GitHub</a>
-      <a href="https://github.com/Evr1kys/HydraFlow/blob/main/docs/cdn-setup.md">CDN Setup</a>
-      <a href="https://github.com/Evr1kys/HydraFlow/blob/main/docs/troubleshooting.md">Troubleshooting</a>
-      <a href="https://github.com/Evr1kys/HydraFlow/blob/main/docs/bypass-methods.md">Bypass Methods</a>
-    </div>
-  </div>
-</footer>
+<span class="g">[+]</span> hydraflow-xray:  <span class="g">RUNNING</span>
+<span class="g">[+]</span> hydraflow-sub:   <span class="g">RUNNING</span>
+<span class="g">[+]</span> <span class="w">Completed in 12s.</span></pre></div>
+<div class="scr reveal d1"><div class="scr-h"><i></i><i></i><i></i><span>probe results</span></div><pre><span class="d">$</span> <span class="w">hydraflow probe server:443</span>
 
+  port_reachability    <span class="g">[PASS]</span>  0s
+  tls_fingerprint      <span class="g">[PASS]</span>  47ms
+    <span class="d">version: TLS 1.3</span>
+    <span class="d">cipher: AES_256_GCM</span>
+  sni_filtering        <span class="g">[PASS]</span>
+    <span class="d">microsoft.com: ok</span>
+    <span class="d">cloudflare.com: ok</span>
+  quic_availability    <span class="g">[PASS]</span>
+  fragment_bypass      <span class="g">[PASS]</span>
+    <span class="d">optimal: 50 bytes</span></pre></div>
+</div></div></section>
+
+<section class="cta"><div class="container">
+<h2 class="reveal" data-i18n-h="cta">Internet should be <span class="grad">free for everyone.</span></h2>
+<p class="reveal d1" data-i18n="ctad">HydraFlow is open source and always will be.</p>
+<a href="https://github.com/Evr1kys/HydraFlow" class="btn btn-fill reveal d2" data-i18n="ctab">View on GitHub</a>
+<p class="cta-q reveal d3" data-i18n="ctaq">"Cut one head, two more grow back."</p>
+</div></section>
+
+<footer><div class="container fi2">
+<span class="fc">HydraFlow &copy; 2026. MPL-2.0</span>
+<div class="fl"><a href="https://github.com/Evr1kys/HydraFlow">GitHub</a><a href="https://github.com/Evr1kys/HydraFlow/blob/main/docs/cdn-setup.md" data-i18n="fl1">CDN Setup</a><a href="https://github.com/Evr1kys/HydraFlow/blob/main/docs/bypass-methods.md" data-i18n="fl2">Bypass Methods</a><a href="https://github.com/Evr1kys/HydraFlow/blob/main/docs/troubleshooting.md" data-i18n="fl3">Troubleshooting</a></div>
+</div></footer>
+</div>
 <script>
-// Scroll animations
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(e => { if (e.isIntersecting) { e.target.style.animationPlayState = 'running'; }});
-}, { threshold: 0.1 });
-document.querySelectorAll('.animate').forEach(el => {
-  el.style.animationPlayState = 'paused';
-  observer.observe(el);
-});
+const I={en:{badge:"Open Source Anti-Censorship",h1:'Cut one head,<br><span class="grad">two more grow back.</span>',hdesc:"Smart proxy that auto-detects your ISP, selects the best bypass method, and switches protocols when one gets blocked.",hb1:"Get Started",hb2:"How it works",hnote:"Ubuntu, Debian, CentOS. Installs in 30 seconds.",s1:"Lines of Go",s2:"Bypass methods",s3:"ISP profiles",s4:"Tests passing",nav1:"How it works",nav2:"Features",nav3:"Bypass",nav4:"Compare",nav5:"Connect",ht:"How it works",htt:"Intelligence at every step",htd:"HydraFlow probes the network, detects what's blocked, and delivers the optimal configuration — automatically.",st1:"Install",sd1:"One command on your VPS. Configures xray with 3 protocols.",st2:"Detect",sd2:"Identifies client ISP and checks which protocols are blocked.",st3:"Optimize",sd3:"Returns subscription ordered by effectiveness with bypass settings.",st4:"Adapt",sd4:"Protocol blocked? Auto-switch. Health checks every 5 minutes.",ft:"Features",ftt:"Everything to bypass censorship",f1t:"Smart Subscription",f1d:"Detects client ISP and returns the best protocol configuration with bypass settings.",f2t:"All Bypass Methods",f2d:"TLS fragmentation, padding, TCP desync, SNI rotation, multi-hop chains, DoH.",f3t:"Multi-Protocol",f3d:"VLESS+Reality, WebSocket+CDN, Shadowsocks-2022. Auto-failover on block.",f4t:"CDN Fallback",f4d:"WebSocket through Cloudflare. DPI sees Cloudflare IP — can't block.",f5t:"Works with Everything",f5d:"Standalone or with 3x-ui, Marzban. v2rayNG, Hiddify, Clash, sing-box.",f6t:"Security Built In",f6d:"Anti-probe, rate limiting, IP hashing, TLS 1.3, ad blocking.",bt:"Bypass methods",btt:"Every technique in one tool",bh1:"Method",bh2:"What it does",bh3:"Against",bh4:"Status",active:"Active",b1:"TLS 1.3 mimicry — looks like real HTTPS",b1a:"Most DPI",b2:"Traffic through Cloudflare — IP hidden",b2a:"IP blocking",b3n:"TLS Fragmentation",b3:"Splits ClientHello to hide SNI",b3a:"SNI DPI",b4n:"Traffic Padding",b4:"Random data changes packet patterns",b4a:"Behavioral DPI",b5n:"SNI Rotation",b5:"Government domains as camouflage",b5a:"Domain blocking",b6n:"Multi-hop Chain",b6:"Client → RU → Foreign server",b6a:"IP blocking",b7:"Encrypted stream, no TLS",b7a:"TLS DPI",b8:"Encrypted DNS",b8a:"DNS censorship",ct:"Comparison",ctt:"How HydraFlow compares",ch1:"Feature",c1:"One-command install",c2:"ISP auto-detection",c3:"Smart protocol selection",c4:"Auto bypass settings",c5:"Multi-protocol failover",c6:"CDN fallback",c7:"Panel integration",c8:"Ad blocking",partial:"Partial",dt:"Connect",dtt:"Works on every device",da1:'Install <strong>v2rayNG</strong> or <strong>Hiddify</strong>',da2:"Add subscription URL",da3:"Connect",di1:'Install <strong>Hiddify</strong> or <strong>Streisand</strong>',di2:"Add subscription URL",di3:"Connect",dw1:'Download <strong>Hiddify</strong> or <strong>v2rayN</strong>',dw2:"Add subscription URL",dw3:"Connect",dm1:'Download <strong>Hiddify</strong> or <strong>Clash Verge</strong>',dm2:"Add subscription URL",dm3:"Connect",scrt:"In action",scrtt:"What you see after install",cta:'Internet should be <span class="grad">free for everyone.</span>',ctad:"HydraFlow is open source and always will be.",ctab:"View on GitHub",ctaq:'"Cut one head, two more grow back."',fl1:"CDN Setup",fl2:"Bypass Methods",fl3:"Troubleshooting"},
+ru:{badge:"Свободный интернет",h1:'Отрубишь одну голову —<br><span class="grad">вырастут две новые.</span>',hdesc:"Умный прокси, который определяет провайдера, выбирает лучший обход и переключает протоколы при блокировке.",hb1:"Начать",hb2:"Как работает",hnote:"Ubuntu, Debian, CentOS. Установка за 30 секунд.",s1:"Строк кода",s2:"Методов обхода",s3:"Профилей ISP",s4:"Тестов",nav1:"Как работает",nav2:"Возможности",nav3:"Обходы",nav4:"Сравнение",nav5:"Подключение",ht:"Как работает",htt:"Интеллект на каждом шаге",htd:"HydraFlow тестирует сеть, определяет блокировки и отдаёт оптимальный конфиг — автоматически.",st1:"Установка",sd1:"Одна команда на VPS. Настраивает xray с 3 протоколами.",st2:"Определение",sd2:"Определяет провайдера клиента и проверяет блокировки.",st3:"Оптимизация",sd3:"Отдаёт подписку с протоколами по эффективности и bypass настройками.",st4:"Адаптация",sd4:"Заблокировали? Авто-переключение. Проверка каждые 5 минут.",ft:"Возможности",ftt:"Всё для обхода блокировок",f1t:"Умная подписка",f1d:"Определяет провайдера и отдаёт лучший конфиг с bypass настройками.",f2t:"Все методы обхода",f2d:"Фрагментация, паддинг, TCP desync, ротация SNI, цепочки, DoH.",f3t:"Мульти-протокол",f3d:"VLESS+Reality, WebSocket+CDN, Shadowsocks-2022. Авто-переключение.",f4t:"CDN фоллбэк",f4d:"WebSocket через Cloudflare. DPI видит IP Cloudflare — не заблокирует.",f5t:"Совместимость",f5d:"Standalone или с 3x-ui, Marzban. v2rayNG, Hiddify, Clash, sing-box.",f6t:"Безопасность",f6d:"Защита от зондов, rate limiting, хеши IP, TLS 1.3, блокировка рекламы.",bt:"Методы обхода",btt:"Все техники в одном инструменте",bh1:"Метод",bh2:"Что делает",bh3:"Против",bh4:"Статус",active:"Активен",b1:"Мимикрия TLS 1.3 — выглядит как настоящий HTTPS",b1a:"Большинство DPI",b2:"Трафик через Cloudflare — IP скрыт",b2a:"Блокировка IP",b3n:"Фрагментация TLS",b3:"Разбивает ClientHello чтобы скрыть SNI",b3a:"SNI DPI",b4n:"Паддинг трафика",b4:"Случайные данные меняют паттерн",b4a:"Поведенческий DPI",b5n:"Ротация SNI",b5:"Госуслуги как камуфляж",b5a:"Блокировка доменов",b6n:"Цепочка серверов",b6:"Клиент → РУ → Зарубежный сервер",b6a:"Блокировка IP",b7:"Шифрованный поток без TLS",b7a:"DPI по TLS",b8:"Шифрованный DNS",b8a:"DNS-цензура",ct:"Сравнение",ctt:"HydraFlow в сравнении",ch1:"Функция",c1:"Установка одной командой",c2:"Определение провайдера",c3:"Умный выбор протокола",c4:"Авто-обход (фрагментация)",c5:"Мульти-протокол",c6:"CDN фоллбэк",c7:"Интеграция с панелями",c8:"Блокировка рекламы",partial:"Частично",dt:"Подключение",dtt:"Работает на всех устройствах",da1:'Установите <strong>v2rayNG</strong> или <strong>Hiddify</strong>',da2:"Добавьте URL подписки",da3:"Подключитесь",di1:'Установите <strong>Hiddify</strong> или <strong>Streisand</strong>',di2:"Добавьте URL подписки",di3:"Подключитесь",dw1:'Скачайте <strong>Hiddify</strong> или <strong>v2rayN</strong>',dw2:"Добавьте URL подписки",dw3:"Подключитесь",dm1:'Скачайте <strong>Hiddify</strong> или <strong>Clash Verge</strong>',dm2:"Добавьте URL подписки",dm3:"Подключитесь",scrt:"В действии",scrtt:"Что вы увидите после установки",cta:'Интернет должен быть <span class="grad">свободным для всех.</span>',ctad:"HydraFlow — open source навсегда.",ctab:"GitHub",ctaq:"«Отрубишь одну голову — вырастут две новые.»",fl1:"Настройка CDN",fl2:"Методы обхода",fl3:"Решение проблем"},
+zh:{badge:"开源反审查",h1:'砍掉一个头，<br><span class="grad">长出两个新的。</span>',hdesc:"智能代理，自动检测ISP，选择最佳绕过方法，被封锁时自动切换。",hb1:"开始使用",hb2:"工作原理",hnote:"Ubuntu, Debian, CentOS。30秒完成安装。",s1:"行Go代码",s2:"绕过方法",s3:"ISP配置",s4:"测试通过",nav1:"原理",nav2:"功能",nav3:"绕过",nav4:"对比",nav5:"连接",ht:"工作原理",htt:"每步都有智能",htd:"HydraFlow探测网络，检测封锁，自动提供最优配置。",st1:"安装",sd1:"VPS上一条命令，配置3个协议。",st2:"检测",sd2:"识别客户端ISP，检查哪些协议被封。",st3:"优化",sd3:"按有效性排序返回订阅，含绕过设置。",st4:"适应",sd4:"被封锁？自动切换。每5分钟健康检查。",ft:"功能",ftt:"绕过审查所需的一切",f1t:"智能订阅",f1d:"检测ISP并返回最佳协议配置。",f2t:"全部绕过方法",f2d:"TLS分片、填充、TCP去同步、SNI轮换、多跳、DoH。",f3t:"多协议",f3d:"VLESS+Reality、WebSocket+CDN、SS-2022。自动切换。",f4t:"CDN回退",f4d:"通过Cloudflare的WebSocket。DPI看到CF的IP——无法封锁。",f5t:"兼容一切",f5d:"独立或配合3x-ui、Marzban。支持v2rayNG、Hiddify、Clash。",f6t:"内置安全",f6d:"反探测、速率限制、IP哈希、TLS 1.3、广告拦截。",bt:"绕过方法",btt:"所有技术集于一体",bh1:"方法",bh2:"作用",bh3:"针对",bh4:"状态",active:"活跃",b1:"TLS 1.3伪装——像真实HTTPS",b1a:"大多数DPI",b2:"经Cloudflare——隐藏IP",b2a:"IP封锁",b3n:"TLS分片",b3:"拆分ClientHello隐藏SNI",b3a:"SNI DPI",b4n:"流量填充",b4:"随机数据改变包模式",b4a:"行为DPI",b5n:"SNI轮换",b5:"政府域名伪装",b5a:"域名封锁",b6n:"多跳链",b6:"客户端→中转→目标",b6a:"IP封锁",b7:"无TLS加密流",b7a:"TLS DPI",b8:"加密DNS",b8a:"DNS审查",ct:"对比",ctt:"HydraFlow对比",ch1:"功能",c1:"一键安装",c2:"ISP检测",c3:"智能协议选择",c4:"自动绕过",c5:"多协议故障转移",c6:"CDN回退",c7:"面板集成",c8:"广告拦截",partial:"部分",dt:"连接",dtt:"支持所有设备",da1:'安装<strong>v2rayNG</strong>或<strong>Hiddify</strong>',da2:"添加订阅URL",da3:"连接",di1:'安装<strong>Hiddify</strong>或<strong>Streisand</strong>',di2:"添加订阅URL",di3:"连接",dw1:'下载<strong>Hiddify</strong>或<strong>v2rayN</strong>',dw2:"添加订阅URL",dw3:"连接",dm1:'下载<strong>Hiddify</strong>或<strong>Clash Verge</strong>',dm2:"添加订阅URL",dm3:"连接",scrt:"实际效果",scrtt:"安装后的界面",cta:'互联网应该对所有人<span class="grad">自由开放。</span>',ctad:"HydraFlow永远开源。",ctab:"GitHub",ctaq:"「砍掉一个头，长出两个新的。」",fl1:"CDN设置",fl2:"绕过方法",fl3:"故障排除"}};
+function L(l){document.documentElement.dataset.lang=l;localStorage.setItem('hf-l',l);document.querySelectorAll('.lang-sw button').forEach(b=>b.classList.toggle('active',b.textContent.trim()===l.toUpperCase()));const t=I[l]||I.en;document.querySelectorAll('[data-i18n]').forEach(e=>{const k=e.dataset.i18n;if(t[k])e.innerHTML=t[k]});document.querySelectorAll('[data-i18n-h]').forEach(e=>{const k=e.dataset.i18nH;if(t[k])e.innerHTML=t[k]})}
+const sv=localStorage.getItem('hf-l');if(sv&&I[sv])L(sv);
+const O=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('v')})},{threshold:.12});document.querySelectorAll('.reveal').forEach(e=>O.observe(e));
+window.addEventListener('scroll',()=>{document.querySelector('nav').classList.toggle('scrolled',scrollY>40)});
+let ct=!1;const CO=new IntersectionObserver(es=>{if(ct)return;es.forEach(e=>{if(!e.isIntersecting)return;ct=!0;document.querySelectorAll('[data-c]').forEach(el=>{const end=+el.dataset.c,dur=1200,st=performance.now();(function t(n){const p=Math.min((n-st)/dur,1),v=Math.round(end*p);el.textContent=v>=1e3?(v/1e3).toFixed(v>=1e4?0:1)+'K':v;if(p<1)requestAnimationFrame(t)})(st)})})},{threshold:.5});const se=document.querySelector('.stats');if(se)CO.observe(se);
 </script>
 </body>
 </html>
