@@ -94,10 +94,10 @@ auto_select_ports() {
     STATS_PORT=$(find_free_port ${STATS_PORT})
 
     # Warn if ports changed from defaults
-    [ "$REALITY_PORT" != "443" ] && warn "Port 443 occupied, using ${REALITY_PORT} for Reality"
-    [ "$WS_PORT" != "2053" ] && warn "Port 2053 occupied, using ${WS_PORT} for WebSocket"
-    [ "$SS_PORT" != "8388" ] && warn "Port 8388 occupied, using ${SS_PORT} for Shadowsocks"
-    [ "$SUB_PORT" != "10086" ] && warn "Port 10086 occupied, using ${SUB_PORT} for subscription"
+    [ "$REALITY_PORT" != "443" ] && warn "Port 443 occupied, using ${REALITY_PORT} for Reality" || true
+    [ "$WS_PORT" != "2053" ] && warn "Port 2053 occupied, using ${WS_PORT} for WebSocket" || true
+    [ "$SS_PORT" != "8388" ] && warn "Port 8388 occupied, using ${SS_PORT} for Shadowsocks" || true
+    [ "$SUB_PORT" != "10086" ] && warn "Port 10086 occupied, using ${SUB_PORT} for subscription" || true
 }
 XRAY_ASSET_DIR="/usr/local/share/xray"
 
