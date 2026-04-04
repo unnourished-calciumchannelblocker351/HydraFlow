@@ -748,7 +748,25 @@ cat > "${XRAY_CONFIG}" << XRAYEOF
       {
         "type": "field",
         "outboundTag": "block",
-        "domain": ["geosite:category-ads-all"]
+        "domain": [
+          "geosite:category-ads-all",
+          "domain:doubleclick.net",
+          "domain:googlesyndication.com",
+          "domain:googleadservices.com",
+          "domain:google-analytics.com",
+          "domain:adservice.google.com",
+          "domain:pagead2.googlevideo.com",
+          "domain:s0.2mdn.net",
+          "domain:ad.youtube.com",
+          "domain:ads.youtube.com",
+          "domain:facebook-ads.com",
+          "domain:analytics.tiktok.com",
+          "domain:ads.tiktok.com",
+          "domain:mc.yandex.ru",
+          "domain:an.yandex.ru",
+          "domain:yandexadexchange.net",
+          "domain:adfox.ru"
+        ]
       },
       {
         "type": "field",
