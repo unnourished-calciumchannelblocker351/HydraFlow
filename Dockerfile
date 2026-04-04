@@ -9,7 +9,6 @@ COPY . .
 
 RUN CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(git describe --tags --always 2>/dev/null || echo dev)" -o /bin/hydraflow ./cmd/hydraflow/
 RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o /bin/hydraflow-sub ./tools/sub-server.go
-RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o /bin/hydraflow-map ./cmd/hydraflow-map/
 
 FROM alpine:3.20
 
@@ -17,12 +16,11 @@ RUN apk add --no-cache ca-certificates tzdata curl
 
 COPY --from=builder /bin/hydraflow /usr/local/bin/hydraflow
 COPY --from=builder /bin/hydraflow-sub /usr/local/bin/hydraflow-sub
-COPY --from=builder /bin/hydraflow-map /usr/local/bin/hydraflow-map
 
-RUN mkdir -p /etc/hydraflow /var/lib/hydraflow-map
+RUN mkdir -p /etc/hydraflow
 
 VOLUME /etc/hydraflow
-EXPOSE 443 2053 8388 10086 8080
+EXPOSE 443 2053 8388 10086
 
 ENTRYPOINT ["hydraflow"]
 CMD ["serve"]
